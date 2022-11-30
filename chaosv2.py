@@ -1,0 +1,265 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 16 09:31:16 2022
+
+@author: Yonathan
+"""
+
+import numpy as np
+import csv
+import glob
+import os
+
+from scipy import signal
+from matplotlib import pyplot as plt
+import matplotlib as mpl
+
+from time import sleep
+from IPython.display import display, clear_output
+
+#%%
+_cache = {}
+
+#%%
+def read_data(file, col, end=None, use_cache=True, do_print=True):
+    if isinstance(col, int):
+        col = [col]
+    
+    cache_key = (file, ','.join([str(x) for x in col]))
+    if do_print:
+        print(f'Cache key: {cache_key}')
+    if use_cache and cache_key in _cache:
+        if do_print:
+            print(f'Cache hit for {cache_key}!')
+        return _cache[cache_key]
+    
+    filedata = []
+        
+    for c in col:
+        filedata.append([])
+        
+    if do_print:
+        print(f'Opening {file}')
+    with open(file) as csvfile:
+        reader = csv.reader(csvfile)
+        if end is None:
+            it = reader
+        else:
+            it = [r for i,r in enumerate(reader) if i <= end]
+        for i, row in enumerate(reader):
+            # print(f'Reading {i}')
+            for j, c in enumerate(col):
+                filedata[j].append(float(row[c]))
+    
+    if len(filedata) == 1:
+        _cache[cache_key] = filedata[0]
+    else:
+        _cache[cache_key] = tuple(filedata)
+        
+    return _cache[cache_key]
+    
+def read_folder(path):
+    data={}
+    files = glob.glob(f'{path}/*.csv')
+    files = [f for f in files if 'am' not in f]
+    
+    print(f'Reading {len(files)} files...')
+    for file in files:
+        m_volts = int(os.path.basename(file).split('.')[0])
+        data.update({m_volts: read_data(file)})
+        
+        print(f'Reading {file}')
+
+    print('')
+    print('Done reading.')
+    return data
+
+def read_modulated_data(file, win_size, limit=1, offset=0, cols=[4, 10], stride=1, do_print=True):
+    if do_print:
+        print(f'Reading modulated file {file}')
+    cols_data = read_data(file, col=cols, do_print=do_print)
+    input_v = cols_data[0]
+    measured_data = cols_data[1:]
+    
+    return analyze_am_signal(input_v, measured_data, win_size, limit, offset, stride, do_print=do_print)
+
+
+def analyze_am_signal(input_voltage, measured_data, win_size, limit=1, 
+                      offset=0, stride=1, do_print=True):
+    if do_print:
+        print('Analyzing AM signal.')
+    data=[]
+    for i in measured_data:
+        data.append({})
+    
+    length=len(input_voltage)
+    
+    trace_offset = int(length*offset)
+    trace_limit = int(length*limit)-int(win_size*stride)+trace_offset
+        
+    
+    for i in range(trace_offset, trace_limit, int(win_size*stride)):
+        if do_print:
+            print(f'Step {i}')
+        
+        sub_i_v = input_voltage[i:i+win_size]
+        
+        voltage = int(np.max(np.abs(np.asarray(sub_i_v))) * 1000)
+        
+        for j, measurement in enumerate(measured_data):
+            sub_array = measurement[i: i+win_size]
+            if voltage in data[j]:  
+                data[j][voltage] = np.append(data[j][voltage], sub_array)
+            else:
+                data[j].update({voltage: sub_array})
+    if do_print:
+        print(f'Done reading. Data length: {len(data[0])}')
+    # if len(data) == 1:
+    #     return data[0]
+    
+    return np.asarray(data)
+
+def multiprocess_analyzer_am_signal(input_voltage, measured_data, 
+                                    win_size, limit=1, offset=0, stride=1, 
+                                    do_print=True, max_workers=1):
+    import concurrent.futures
+    
+    data_length = len(input_voltage)
+    index_map = [int(data_length*i/max_workers) for i in range(max_workers+1)]
+    
+    exec_results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_data = {
+                executor.submit(analyze_am_signal, 
+                                input_voltage[index_map[i]: index_map[i+1]],
+                                measured_data[:, index_map[i]: index_map[i+1]],
+                                win_size, limit, offset, stride, False): i
+                for i in range(max_workers)
+            }
+        
+        for future in concurrent.futures.as_completed(future_to_data):
+            data = future_to_data[future]
+            res = future.result()
+            exec_results[data] = res
+            
+    final = [{} for i in range(measured_data.shape[0])]
+    for worker in exec_results:
+        for i, val in enumerate(exec_results[worker]):
+            for voltage in val:
+                if voltage in final[i]:
+                    final[i][voltage] = np.append(final[i][voltage], val[voltage])
+                else:
+                    final[i][voltage] = val[voltage]
+            
+    return final
+
+    
+
+def extract_peaks(x, prominence=0.5):
+    peak_indices = signal.find_peaks(x, prominence=prominence)[0]
+    peak_vals = [x[i] for i in peak_indices]
+    return list(set(peak_vals))
+
+def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5, do_print=True):        
+    vals = gen_bi_plot_data(data, prominence=prominence, do_print=do_print)
+    
+    if do_print:
+        print(f'Plotting...')
+    plt.scatter(vals[:,0], vals[:,1], c=c, marker=marker, label=label)
+
+    plt.xlabel('Input Voltage (mV)')
+    plt.ylabel('Diode Voltage values (V)')
+    if show:
+        plt.show()
+
+    if do_print:
+        print('Done plotting.')
+    return vals
+
+def gen_bi_plot_data(data, do_print=True, prominence=1):
+    if do_print:
+        print('Finding peaks...')
+    peak_data = {}
+    for voltage in data.keys():
+        peaks = extract_peaks(data[voltage], prominence=prominence)
+        peak_data.update({voltage: peaks})
+        if do_print:
+            print(f'Found {len(peak_data[voltage])} peaks for {voltage} mV')
+    if do_print:
+        print('')
+        print('Done peak search.')
+ 
+    vals = []
+    for x in np.asarray([
+     [[voltage, peak] for peak in peak_data[voltage]]
+     for voltage in peak_data.keys()
+     ], dtype=object):
+        if x != []:
+            for y in x:
+                vals.append(y)
+                
+    return np.asarray(vals)
+
+def plot_zooms(data, filters, legend_mapping, prefix=None, marker='.'):
+    colors = legend_mapping[0]
+    for j, f in enumerate(filters):
+        print(f'Plotting {f[0]}-{f[1]}')
+        legend_loc = None
+        if isinstance(f, tuple):
+            legend_loc = f[1]
+            f = f[0]
+
+        for i in [0,1]:
+            filtered_keys = [k for k in data[i].keys() if f[0] <= k <= f[1]]
+            filtered = {}
+            for k in filtered_keys:
+                filtered[k] = data[i][k]
+
+            mpl.rcParams['lines.markersize'] = 4
+            plot_bi_map(filtered, c=colors[i], show=False, marker=marker)
+
+#         plt.title(f'{prefix}section {chr(j+65)} ({f[0]}-{f[1]} mV)')
+        plt.title(f'{prefix}section {j+1} ({f[0]}-{f[1]} mV)')
+        plt.show()
+
+def find_bifurcations(bi_map, threshold = 1):
+    from scipy import cluster
+
+    # Aggregate data
+    joined = {}
+    for voltage, val in ((bi_map[i,0], bi_map[i,1]) for i in range(bi_map.shape[0]) ):
+        if voltage not in joined:
+            joined[voltage] = []
+        joined[voltage].append(val)
+
+    voltages = np.sort([v for v in joined.keys()])
+        
+    # Calculate clusters
+    x = np.ones((len(voltages), 2))
+    for i, voltage in enumerate(voltages):
+        vals = np.sort(joined[voltage])
+        jumps = np.array([vals[i+1]-vals[i] for i in range(vals.shape[0]-1)])
+        jump_count = np.count_nonzero(jumps > threshold)
+        bi_nums = jump_count+1
+
+        if bi_nums < 8:
+            try:
+                clustered, _ = cluster.vq.kmeans(vals, bi_nums)
+                x[i,:] = [voltage, clustered.shape[0]]
+            except:
+                x[i,:] = [voltage, 0]
+        else:
+            x[i,:] = [voltage, 0]
+
+    # jump_voltages = [
+    #     (np.min([y[0] for y in x if y[1]==a]), a) 
+    #     for a in np.unique(x[:,1])
+    #     if a > 1
+    #     ]
+    
+    jump_voltages = [
+        x[i,:] for i in range(1,x.shape[0])
+        if x[i,1] > np.max(x[:i,1])
+        ]
+            
+    return jump_voltages

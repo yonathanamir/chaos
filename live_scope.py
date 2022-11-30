@@ -15,7 +15,7 @@ from tabulate import tabulate
 import os
 
 from data_fetchers import DataFetcher, ScopeDataFetcher
-from chaosv2 import analyze_am_signal, gen_bi_plot_data
+from chaosv2 import analyze_am_signal, gen_bi_plot_data, find_bifurcations
 
 
 def init_args(args):
@@ -25,12 +25,14 @@ def init_args(args):
     parser.add_argument('--channels-to-sample', type=int, default=1)
     parser.add_argument('--target-fps', type=int, default=1)
     parser.add_argument('--test-mode', action='store_true')
+    parser.add_argument('--show-bifs', action='store_true')
     
     parser.add_argument('--color', type=str, default='k')
     parser.add_argument('--marker', type=str, default='.')
     parser.add_argument('--marker-size', type=int, default=1)
     parser.add_argument('--xlim', type=int, default=10500)
     parser.add_argument('--ylim', type=int, default=10)
+    parser.add_argument('--dynamic-xlim', action='store_true')
     parser.add_argument('--dynamic-ylim', action='store_true')
     
     parser.add_argument('--window-size', type=int, default=2000)
@@ -41,7 +43,7 @@ def init_args(args):
     return parser.parse_args(args)
 
 
-COLOR_MAP = ['k', 'b', 'r', 'p']
+COLOR_MAP = ['b', 'r', 'g', 'k', 'm']
 
 def add_random_noise(data):
     import random
@@ -79,9 +81,12 @@ def do_main(args):
     data_fetcher = DataFetcher()
     if not args.test_mode:
         data_fetcher = ScopeDataFetcher(args.visa_address, args.channels_to_sample)
-        
-    sc = ax.scatter([], [], c=args.color, marker=args.marker)
+      
+    scatters = []
+    for i in range(args.channels_to_sample):
+        scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
 
+    axvs = []
     while True:
         try:
             t1 = datetime.now()
@@ -97,14 +102,32 @@ def do_main(args):
                                          stride=args.stride, do_print=False)
             t3 = datetime.now()
             
+            ymaxs = []
             for i, channel in enumerate(analyzed):
-                data = gen_bi_plot_data(channel, do_print=False)
-                
-            sc.set_offsets(np.c_[data[:,0],data[:,1]])
+
+                if args.show_bifs:
+                    for x in axvs:
+                        x.remove()
+                    axvs = []
+
+                data = gen_bi_plot_data(channel, do_print=False, prominence=1)
+                scatters[i].set_offsets(np.c_[data[:,0],data[:,1]])
+
+                ymaxs.append(np.max(data[:,1]))
+
+                if args.dynamic_xlim:
+                    ax.set_xlim([np.min(np.abs(data[:,0])*0.9), np.max(np.abs(data[:,0]))*1.1])
+
+                if args.show_bifs:
+                    bifurcations = find_bifurcations(data, threshold=1)
+                            
+                    for v in bifurcations:
+                        if v[1] < 4:
+                            axvs.append(ax.axvline(x=v[0], color='k', alpha=0.1))
             
             if args.dynamic_ylim:
-                ax.set_ylim([0, np.max(data[:,1])*1.1])
-            
+                ax.set_ylim([0, np.max(ymaxs)*1.1])
+
             t4 = datetime.now()
     
             

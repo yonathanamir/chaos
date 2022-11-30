@@ -15,7 +15,7 @@ class DataFetcher:
     
     def get_data(self):
         if self._data is None:
-            file = r"C:\University\Semester G\Lab B2\Week 3\parallel.csv"
+            file = r"C:\Users\owner\Desktop\yonathan\week 3\parallel.csv"
             cols = [4, 10]
             
             from chaosv2 import read_data
@@ -54,7 +54,7 @@ class ScopeDataFetcher(DataFetcher):
         return np.asarray(input_v), np.asarray(measured_data)
     
     def _sample_channel(self, channel):
-        print(f'Sampling channel {channel}')
+        # print(f'Sampling channel {channel}')
         self.scope.write('header 0')
         self.scope.write('data:encdg SRIBINARY')
         self.scope.write(f'data:source CH{channel}') # channel
@@ -76,7 +76,7 @@ class ScopeDataFetcher(DataFetcher):
         t7 = time.perf_counter()
         bin_wave = self.scope.query_binary_values('curve?', datatype='b', container=np.array)
         t8 = time.perf_counter()
-        print('transfer time: {} s'.format(t8 - t7))
+        # print('transfer time: {} s'.format(t8 - t7))
 
         # retrieve scaling factors
         vscale = float(self.scope.query('wfmoutpre:ymult?')) # volts / level
@@ -85,9 +85,9 @@ class ScopeDataFetcher(DataFetcher):
 
         # error checking
         r = int(self.scope.query('*esr?'))
-        print('event status register: 0b{:08b}'.format(r))
+        # print('event status register: 0b{:08b}'.format(r))
         r = self.scope.query('allev?').strip()
-        print('all event messages: {}'.format(r))
+        # print('all event messages: {}'.format(r))
 
         unscaled_wave = np.array(bin_wave, dtype='double') # data type conversion
         scaled_wave = (unscaled_wave - vpos) * vscale + voff

@@ -152,7 +152,6 @@ def multiprocess_analyzer_am_signal(input_voltage, measured_data,
                     final[i][voltage] = val[voltage]
             
     return final
-
     
 
 def extract_peaks(x, prominence=0.5):
@@ -160,8 +159,22 @@ def extract_peaks(x, prominence=0.5):
     peak_vals = [x[i] for i in peak_indices]
     return list(set(peak_vals))
 
-def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5, do_print=True):        
-    vals = gen_bi_plot_data(data, prominence=prominence, do_print=do_print)
+def max_val_window_peaks(data, win_size, offset=0, _DEBUG=False):
+    peak_vals = []
+    for i in range(offset, len(data), win_size):
+        peak_vals.append(np.max(data[i:i+win_size]))
+        if _DEBUG:
+            d = data[i:i+win_size]; 
+            plt.plot(np.arange(d.shape[0]), d); 
+            plt.title(i); 
+            plt.show();
+    
+    return np.unique(np.around(peak_vals, 3))
+
+def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
+                do_print=True, win_size=None):        
+    vals = gen_bi_plot_data(data, prominence=prominence, do_print=do_print, 
+                            win_size=win_size)
     
     if do_print:
         print(f'Plotting...')
@@ -176,12 +189,24 @@ def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5, 
         print('Done plotting.')
     return vals
 
-def gen_bi_plot_data(data, do_print=True, prominence=1):
+def gen_bi_plot_data(data, do_print=True, prominence=1,
+                     win_size=None):
     if do_print:
         print('Finding peaks...')
     peak_data = {}
     for voltage in data.keys():
-        peaks = extract_peaks(data[voltage], prominence=prominence)
+        if win_size is None:    # signal find_peaks algorithm
+            peaks = extract_peaks(data[voltage], prominence=prominence)
+        else:   # Max-val window peak search
+            # debug = voltage // 1000 == 3
+            debug=False
+            
+            if debug:    
+                plt.plot(np.arange(data[voltage].shape[0]), data[voltage]); 
+                plt.title(f'Voltage {voltage}'); 
+                plt.show();
+            peaks = max_val_window_peaks(data[voltage], win_size=win_size, 
+                                         _DEBUG=False)
         peak_data.update({voltage: peaks})
         if do_print:
             print(f'Found {len(peak_data[voltage])} peaks for {voltage} mV')
@@ -222,7 +247,7 @@ def plot_zooms(data, filters, legend_mapping, prefix=None, marker='.'):
         plt.title(f'{prefix}section {j+1} ({f[0]}-{f[1]} mV)')
         plt.show()
 
-def find_bifurcations(bi_map, threshold = 1):
+def find_bifurcations(bi_map, threshold = 1, back_window=1):
     from scipy import cluster
 
     # Aggregate data
@@ -259,7 +284,11 @@ def find_bifurcations(bi_map, threshold = 1):
     
     jump_voltages = [
         x[i,:] for i in range(1,x.shape[0])
-        if x[i,1] > np.max(x[:i,1])
+        if x[i,1] > np.max(x[np.max([0,i-back_window]):i,1])
         ]
             
     return jump_voltages
+
+def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
+    dt = total_time_length / total_pixel_length
+    return int(1 / (input_am_frequency * dt))

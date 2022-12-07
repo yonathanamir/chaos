@@ -9,7 +9,7 @@ from datetime import datetime
 mpl.rcParams.update(mpl.rcParamsDefault)
 mpl.rcParams['lines.markersize'] = 1
 
-COLOR_LIST = ['r', 'b']
+COLOR_LIST = ['r', 'b', 'g', 'orange']
 
 #%% Single
 am_file = r"C:\University\Semester G\Lab B2\Week 3\parallel.csv"
@@ -26,33 +26,54 @@ print('Done!')
 #%% Folder
 import os
 import glob
+
+time_length_secs = 0.1 # in seconds
+total_pixel_length = 10**6
+input_am_frequency = 25 * 10 ** 3 # in Hz
+sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
+
 t1 = datetime.now()
-am_files = glob.glob(r"C:\University\Semester G\Lab B2\Week 5\*\*.csv")
+am_files = glob.glob(r"C:\University\Semester G\Lab B2\Week 6\single\b*.csv")
 for i, f in enumerate(am_files):
     it = (c for c in COLOR_LIST)
     plt.clf()
     
-    cols = [4,10]
-    if 'to' in f:
-        cols.append(16)
+    if 'cascade' in f:
+        cols = [4,10,16,22]
     
-    datas = read_modulated_data(f, win_size=4000, limit=1, offset=0, cols=cols)
-
-    for d in datas:
-        color = next(it)
-        bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
-        bifurcations = find_bifurcations(bi_map, threshold=0.5)
-                
-        for v in bifurcations:
-            if v[1] < 4:
-                plt.axvline(x=v[0], color=color, alpha=0.3)
+    if 'single' in f:
+        cols = [4,10]
+    
+    if 'parallel' in f:
+        cols = [4,10,16,22]
+    
+    if 'overload' in f:
+        cols = [4,10,16,22]
         
-    title = ' '.join(f.split('\\')[-2:])
-    plt.title(title)
-    plt.xlim(0, 10000)
-    plt.ylim(0, 30)
+    
+    datas = read_modulated_data(f, win_size=sample_win_size, limit=1, offset=0, cols=cols)
 
-    plt.show()
+    for i in range(2):
+        for d in datas:
+            color = next(it)
+            if i == 0:
+                method='find_peaks'
+                bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
+            else:
+                method='max_val'
+                bi_map = plot_bi_map(d, c=color, show=False, marker='.', win_size=sample_win_size)
+            # bifurcations = find_bifurcations(bi_map, threshold=0.5, back_window=5)
+                    
+            # for v in bifurcations:
+            #     if v[1] < 4:
+            #         plt.axvline(x=v[0], color=color, alpha=0.1)
+            
+        title = ' '.join(f.split('\\')[-2:])
+        plt.title(title)
+        plt.xlim(0, 11000)
+        plt.ylim(0, 30)
+    
+        plt.show()
     # plt.savefig(f'{f}.png')
 t2 = datetime.now()
 print(f'Done! {t2-t1}')
@@ -79,16 +100,39 @@ print(f'Done! {t2-t1}')
 #%% Bifurcation detection tests
 am_file = r"C:\University\Semester G\Lab B2\Week 5\symmetric no chaos\b.csv"
 
-datas = read_modulated_data(am_file, win_size=4000, limit=1, offset=0, cols=[4, 10])
+datas = read_modulated_data(am_file, win_size=2000, limit=1, offset=0, cols=[4, 10])
 bi_map = gen_bi_plot_data(datas[0], prominence=1)
 
 plt.scatter(bi_map[:,0], bi_map[:,1], color='b')
 
-bifurcations = find_bifurcations(bi_map)
+bifurcations = find_bifurcations(bi_map, back_window=1)
         
 for v in bifurcations:
-    # if v[1] > 1:
     plt.axvline(x=v[0], color='b', alpha=0.3)
+
+plt.show()
+
+
+print('Done!')
+
+#%% Max peak detection
+am_file = r"C:\University\Semester G\Lab B2\Week 6\single\b-5.csv"
+
+cols = [4, 10]
+cols_data = read_data(am_file, col=cols, do_print=False)
+input_v = cols_data[0]
+measured_data = cols_data[1:]
+
+time_length_secs = 0.1 # in seconds
+total_pixel_length = 10**6
+input_am_frequency = 25 * 10 ** 3 # in Hz
+sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
+
+datas = read_modulated_data(am_file, win_size=sample_win_size)
+bi_map = gen_bi_plot_data(datas[0], win_size=sample_win_size)
+# bi_map = gen_bi_plot_data(datas[0], prominence=1)
+
+plt.scatter(bi_map[:,0], bi_map[:,1], color='r')
 
 plt.show()
 

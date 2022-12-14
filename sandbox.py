@@ -12,12 +12,15 @@ mpl.rcParams['lines.markersize'] = 1
 COLOR_LIST = ['r', 'b', 'g', 'orange']
 
 #%% Single
-am_file = r"C:\University\Semester G\Lab B2\Week 3\parallel.csv"
+am_file = r"C:\Users\owner\Desktop\yonathan\Week 7\singles\a-1.csv"
 # am_file = r"C:\University\Semester G\Lab B2\Week 4\singles\a\a-ramp-1.csv"
 
 datas = read_modulated_data(am_file, win_size=20, limit=1, offset=0, cols=[4, 10])
 
-plot_bi_map(datas, c='r', show=False, marker='.')
+data = gen_bi_plot_data(datas[0], do_print=False, win_size=400)
+
+
+# plot_bi_map(datas, c='r', show=False, marker='.')
 
 plt.show()
 
@@ -138,3 +141,16 @@ plt.show()
 
 
 print('Done!')
+
+#%% From JSON
+import json
+mpl.rcParams['lines.markersize'] = 0.1
+
+
+with open(r'C:\Users\owner\Desktop\yonathan\Week 8\test.json', 'r') as f:
+    data = json.loads(f.read())
+
+a = np.asarray(data[0])
+plt.scatter(a[:,0], a[:,1], color='r')
+plt.show()
+# print(a)

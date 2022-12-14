@@ -40,6 +40,8 @@ def init_args(args):
     parser.add_argument('--offset', type=float, default=0)
     parser.add_argument('--stride', type=float, default=1.0)
     
+    parser.add_argument('--save-after', type=float, default=None)
+    
     return parser.parse_args(args)
 
 
@@ -88,17 +90,28 @@ def do_main(args):
         scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
         
     axvs = []
+    
+    time_length_secs = 0.1 # in seconds
+    total_pixel_length = 10**6
+    input_am_frequency = 25 * 10 ** 3 # in Hz
+    sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
+    
+    if args.save_after:
+        to_save = []
+        for i in range(args.channels_to_sample):
+            to_save.append([])
+    
+    
+    total_time = 0
     while True:
+        if args.save_after and total_time > args.save_after:
+            break
+        
         try:
             t1 = datetime.now()
             input_v, datas = data_fetcher.get_data()
             t2 = datetime.now()
-            
-            time_length_secs = 0.1 # in seconds
-            total_pixel_length = 10**6
-            input_am_frequency = 25 * 10 ** 3 # in Hz
-            sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
-            
+                        
             if args.test_mode:
                 import copy
                 datas = add_random_noise(copy.deepcopy(datas))
@@ -117,6 +130,17 @@ def do_main(args):
                     axvs = []
 
                 data = gen_bi_plot_data(channel, do_print=False, win_size=None)
+                
+                if args.save_after:
+                    for j in range(data.shape[0]):
+                        print(data[j,:])
+                        to_save[i].append(data[j,:].tolist())
+                        # v = data[j,0]
+                        # if v not in to_save[i]:
+                        #     to_save[i][v] = []
+                        # to_save[i][v].append(data[j,1])
+
+                
                 scatters[i].set_offsets(np.c_[data[:,0],data[:,1]])
 
                 ymaxs.append(np.max(data[:,1]))
@@ -140,6 +164,8 @@ def do_main(args):
             fig.canvas.draw()
             fig.canvas.flush_events()
             
+            total_time += time_length_secs
+            
             t5 = datetime.now()
             # diff = t5 - t1
             # print(f'Step exec time: {diff}')
@@ -154,6 +180,12 @@ def do_main(args):
             print('Error getting data, sleeping for 5 sec...')
             time.sleep(5)
             os.system('cls')
+            
+    if args.save_after:
+        import json
+        with open(r'C:\Users\owner\Desktop\yonathan\Week 8\test.json', 'w') as f:
+            f.writelines(json.dumps(to_save))
+        print('Saved!')
 
 if __name__ == '__main__':
     import sys

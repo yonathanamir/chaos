@@ -15,7 +15,7 @@ from tabulate import tabulate
 import os
 
 from data_fetchers import DataFetcher, ScopeDataFetcher
-from chaosv2 import analyze_am_signal, gen_bi_plot_data, find_bifurcations
+from chaosv2 import analyze_am_signal, gen_bi_plot_data, find_bifurcations, calculate_sample_win_size
 
 
 def init_args(args):
@@ -44,6 +44,7 @@ def init_args(args):
 
 
 COLOR_MAP = ['b', 'r', 'g', 'k', 'm']
+# COLOR_MAP = ['k', 'k', 'k', 'k', 'k']
 
 def add_random_noise(data):
     import random
@@ -85,13 +86,18 @@ def do_main(args):
     scatters = []
     for i in range(args.channels_to_sample):
         scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
-
+        
     axvs = []
     while True:
         try:
             t1 = datetime.now()
             input_v, datas = data_fetcher.get_data()
             t2 = datetime.now()
+            
+            time_length_secs = 0.1 # in seconds
+            total_pixel_length = 10**6
+            input_am_frequency = 25 * 10 ** 3 # in Hz
+            sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
             
             if args.test_mode:
                 import copy
@@ -110,7 +116,7 @@ def do_main(args):
                         x.remove()
                     axvs = []
 
-                data = gen_bi_plot_data(channel, do_print=False, prominence=1)
+                data = gen_bi_plot_data(channel, do_print=False, win_size=None)
                 scatters[i].set_offsets(np.c_[data[:,0],data[:,1]])
 
                 ymaxs.append(np.max(data[:,1]))

@@ -31,6 +31,7 @@ class ScopeDataFetcher(DataFetcher):
 
         self.visa_address = visa_address
         self.channels_to_sample = channels_to_sample
+        self.dummy = None
         
         self.rm = visa.ResourceManager()
         self.scope = self.rm.open_resource(self.visa_address)
@@ -49,7 +50,10 @@ class ScopeDataFetcher(DataFetcher):
         input_v = self._sample_channel(1)
         measured_data = []
         for i in range(1, self.channels_to_sample, 1):
-            measured_data.append(self._sample_channel(i+1))
+            try:
+                measured_data.append(self._sample_channel(i+1))
+            except:
+                measured_data.append(self.dummy)
         
         return np.asarray(input_v), np.asarray(measured_data)
     
@@ -90,6 +94,8 @@ class ScopeDataFetcher(DataFetcher):
         # print('all event messages: {}'.format(r))
 
         unscaled_wave = np.array(bin_wave, dtype='double') # data type conversion
+        if self.dummy is None:
+            self.dummy = np.zeros(unscaled_wave.shape)
         scaled_wave = (unscaled_wave - vpos) * vscale + voff
         
         return scaled_wave

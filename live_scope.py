@@ -10,182 +10,119 @@ import time
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-from tabulate import tabulate
 import os
 
-from data_fetchers import DataFetcher, ScopeDataFetcher
-from chaosv2 import analyze_am_signal, gen_bi_plot_data, find_bifurcations, calculate_sample_win_size
+import chaosv2
+from data_fetchers import ScopeDataFetcher
+from awg_device import AwgDevice
+from chaosv2 import calculate_sample_win_size
 
 
 def init_args(args):
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--visa-address', type=str)
+    parser.add_argument('--scope-visa-address', type=str)
+    parser.add_argument('--awg-visa-address', type=str)
     parser.add_argument('--channels-to-sample', type=int, default=1)
-    parser.add_argument('--target-fps', type=int, default=1)
-    parser.add_argument('--test-mode', action='store_true')
-    parser.add_argument('--show-bifs', action='store_true')
-    
+    parser.add_argument('--samples-per-voltage', type=int, default=1)
+
     parser.add_argument('--color', type=str, default='k')
     parser.add_argument('--marker', type=str, default='.')
     parser.add_argument('--marker-size', type=int, default=1)
-    parser.add_argument('--xlim', type=int, default=10500)
-    parser.add_argument('--ylim', type=int, default=10)
-    parser.add_argument('--dynamic-xlim', action='store_true')
-    parser.add_argument('--dynamic-ylim', action='store_true')
-    
+    parser.add_argument('--ylim', type=int, default=15)
+
     parser.add_argument('--window-size', type=int, default=2000)
+    parser.add_argument('--window-pad', type=float, default=0.1)
+
     parser.add_argument('--limit', type=float, default=1.0)
     parser.add_argument('--offset', type=float, default=0)
     parser.add_argument('--stride', type=float, default=1.0)
-    
-    parser.add_argument('--save-after', type=float, default=None)
+
+    parser.add_argument('--v_-in', type=float, default=0.0)
+    parser.add_argument('--v-max', type=float, default=10.0)
+    parser.add_argument('--v-step', type=float, default=0.01)
+
+    parser.add_argument('--freq-sweep', action='store_true')
+    parser.add_argument('--freq-min', type=float, default=10000.0)
+    parser.add_argument('--freq-max', type=float, default=40000.0)
+    parser.add_argument('--freq-step', type=float, default=1000.0)
     
     return parser.parse_args(args)
 
 
 COLOR_MAP = ['b', 'r', 'g', 'k', 'm']
-# COLOR_MAP = ['k', 'k', 'k', 'k', 'k']
 
-def add_random_noise(data):
-    import random
-    
-    for i in range(len(data)):
-        for j in range(len(data[i])):
-            data[i][j] += (0.5 - random.random())
-    
-    return data
-
-def print_time_table(t1,t2,t3,t4,t5):
-    os.system('cls')
-    headers = ['Stage', 'Time']
-    table = [
-        ['Fetch', t2-t1],
-        ['AM Analysis', t3-t2],
-        ['Bi Plot Gen', t4-t3],
-        ['Plot', t5-t4],
-        ['Step Total', t5-t1],
-        ['','']
-    ]
-    
-    print(tabulate(table, headers=headers))
 
 def do_main(args):
     plt.ion()
     fig = plt.figure()
-    ax = fig.add_subplot(111)
-    
-    ax.set_xlim([0, args.xlim])
+
+    if args.freq_sweep:
+        ax = plt.axes(projection='3d')
+        ax.set_zlim([args.freq_min, args.freq_max])
+        ax.set_zlabel("AC Frequency (Hz)")
+    else:
+        ax = fig.add_subplot(111)
+
+    ax.set_xlim([args.v_min, args.v_max])
+    ax.set_xlabel("Input Voltage")
+
     ax.set_ylim([0, args.ylim])
+    ax.set_ylabel("Diode Voltage")
     
     mpl.rcParams['lines.markersize'] = args.marker_size
-    
-    data_fetcher = DataFetcher()
-    if not args.test_mode:
-        data_fetcher = ScopeDataFetcher(args.visa_address, args.channels_to_sample)
-      
-    scatters = []
-    for i in range(args.channels_to_sample):
-        scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
-        
-    axvs = []
-    
+
+    data_fetcher = ScopeDataFetcher(args.scope_visa_address, args.channels_to_sample)
+    awg = AwgDevice(visa_address=args.awg_visa_adress)
+
+    if not args.freq_sweep:
+        scatters = []
+        for i in range(args.channels_to_sample):
+            scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
+
+    # TODO: get from scope
     time_length_secs = 0.1 # in seconds
     total_pixel_length = 10**6
     input_am_frequency = 25 * 10 ** 3 # in Hz
     sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
-    
-    if args.save_after:
-        to_save = []
-        for i in range(args.channels_to_sample):
-            to_save.append([])
-    
-    
-    total_time = 0
+
     while True:
-        if args.save_after and total_time > args.save_after:
-            break
-        
         try:
-            t1 = datetime.now()
-            input_v, datas = data_fetcher.get_data()
-            t2 = datetime.now()
-                        
-            if args.test_mode:
-                import copy
-                datas = add_random_noise(copy.deepcopy(datas))
+            def v_sweep(freq=None):
+                for v in range(args.v_min, args.v_max, args.v_step):
+                    awg.voltage = v
 
-            analyzed = analyze_am_signal(input_v, datas, win_size=args.window_size, 
-                                         limit=args.limit, offset=args.offset, 
-                                         stride=args.stride, do_print=False)
-            t3 = datetime.now()
-            
-            ymaxs = []
-            for i, channel in enumerate(analyzed):
+                    for j in range(args.samples_per_voltage):
+                        input_v, datas = data_fetcher.get_data()
+                        for i in range(args.channels_to_sample):
+                            peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
 
-                if args.show_bifs:
-                    for x in axvs:
-                        x.remove()
-                    axvs = []
+                            if args.freq_sweep:
+                                ax.set_offsets(np.c_[
+                                                            v * np.ones(len(peaks)),
+                                                            peaks,
+                                                            freq * np.ones(len(peaks))
+                                                        ])
+                                fig.canvas.draw()
+                                fig.canvas.flush_events()
+                            else:
+                                scatters[i].set_offsets(np.c_[v*np.ones(len(peaks)), peaks])
+                                fig.canvas.draw()
+                                fig.canvas.flush_events()
 
-                data = gen_bi_plot_data(channel, do_print=False, win_size=None)
-                
-                if args.save_after:
-                    for j in range(data.shape[0]):
-                        print(data[j,:])
-                        to_save[i].append(data[j,:].tolist())
-                        # v = data[j,0]
-                        # if v not in to_save[i]:
-                        #     to_save[i][v] = []
-                        # to_save[i][v].append(data[j,1])
+            if args.freq_sweep:
+                for freq in range(args.freq_min, args.freq_max, args.freq_step):
+                    awg.frequency = freq
+                    v_sweep()
+            else:
+                v_sweep()
 
-                
-                scatters[i].set_offsets(np.c_[data[:,0],data[:,1]])
-
-                ymaxs.append(np.max(data[:,1]))
-
-                if args.dynamic_xlim:
-                    ax.set_xlim([np.min(np.abs(data[:,0])*0.9), np.max(np.abs(data[:,0]))*1.1])
-
-                if args.show_bifs:
-                    bifurcations = find_bifurcations(data, threshold=1)
-                            
-                    for v in bifurcations:
-                        if v[1] < 4:
-                            axvs.append(ax.axvline(x=v[0], color='k', alpha=0.1))
-            
-            if args.dynamic_ylim:
-                ax.set_ylim([0, np.max(ymaxs)*1.1])
-
-            t4 = datetime.now()
-    
-            
-            fig.canvas.draw()
-            fig.canvas.flush_events()
-            
-            total_time += time_length_secs
-            
-            t5 = datetime.now()
-            # diff = t5 - t1
-            # print(f'Step exec time: {diff}')
-            # if diff < timedelta(seconds=args.target_fps):
-            #     tosleep = diff.seconds
-            #     print(f'Sleeping {tosleep} seconds...')
-            #     time.sleep(tosleep)
-            
-            print_time_table(t1, t2, t3, t4, t5)
         except Exception as ex:
             print(ex)
             print('Error getting data, sleeping for 5 sec...')
             time.sleep(5)
             os.system('cls')
-            
-    if args.save_after:
-        import json
-        with open(r'C:\Users\owner\Desktop\yonathan\Week 8\test.json', 'w') as f:
-            f.writelines(json.dumps(to_save))
-        print('Saved!')
+
 
 if __name__ == '__main__':
     import sys

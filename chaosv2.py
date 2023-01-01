@@ -90,7 +90,7 @@ def analyze_am_signal(input_voltage, measured_data, win_size, limit=1,
         print('Analyzing AM signal.')
     data=[]
     for i in measured_data:
-        data.append({})
+        data.append({i})
     
     length=len(input_voltage)
     

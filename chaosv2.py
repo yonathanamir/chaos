@@ -154,15 +154,37 @@ def multiprocess_analyzer_am_signal(input_voltage, measured_data,
     return final
     
 
-def extract_peaks(x, prominence=0.5):
-    peak_indices = signal.find_peaks(x, prominence=prominence)[0]
-    peak_vals = [x[i] for i in peak_indices]
+def extract_peaks(x, prominence=0.5, win_size = None):
+    if win_size is None:
+        peak_indices = signal.find_peaks(x, prominence=prominence)[0]
+        peak_vals = [x[i] for i in peak_indices]
+    else:
+        peak_vals = []
+        for i in range(0, len(x), win_size):
+            # min_i = int(max(i-(window_pad*win_size), 0))
+            # max_i = int(min(i+(1+window_pad)*win_size, len(data)))
+            
+            min_i = i
+            max_i = i+win_size
+            sub_data = x[min_i:max_i]
+
+            peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
+            peak_vals += [sub_data[i] for i in peak_indices]
+
     return list(set(peak_vals))
 
-def max_val_window_peaks(data, win_size, offset=0, _DEBUG=False):
+
+def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
+                         window_pad = 0):
     peak_vals = []
     for i in range(offset, len(data), win_size):
-        peak_vals.append(np.max(data[i:i+win_size]))
+        min_i = int(max(i-(window_pad*win_size), 0))
+        max_i = int(min(i+(1+window_pad)*win_size, len(data)))
+        
+        # min_i = i
+        # max_i = i+win_size
+    
+        peak_vals.append(np.max(data[min_i:max_i]))
         if _DEBUG:
             d = data[i:i+win_size]; 
             plt.plot(np.arange(d.shape[0]), d); 
@@ -172,9 +194,10 @@ def max_val_window_peaks(data, win_size, offset=0, _DEBUG=False):
     return np.unique(np.around(peak_vals, 3))
 
 def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
-                do_print=True, win_size=None):        
+                do_print=True, win_size=None, window_pad = 0,use_find_peaks = False):        
     vals = gen_bi_plot_data(data, prominence=prominence, do_print=do_print, 
-                            win_size=win_size)
+                            win_size=win_size, window_pad = window_pad,
+                            use_find_peaks = use_find_peaks)
     
     if do_print:
         print(f'Plotting...')
@@ -189,14 +212,14 @@ def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
         print('Done plotting.')
     return vals
 
-def gen_bi_plot_data(data, do_print=True, prominence=1,
-                     win_size=None):
+def gen_bi_plot_data(data, do_print=True, prominence=1, use_find_peaks = False,
+                     win_size=None, window_pad = 0):
     if do_print:
         print('Finding peaks...')
     peak_data = {}
     for voltage in data.keys():
-        if win_size is None:    # signal find_peaks algorithm
-            peaks = extract_peaks(data[voltage], prominence=prominence)
+        if use_find_peaks:    # signal find_peaks algorithm
+            peaks = extract_peaks(data[voltage], prominence=prominence, win_size=win_size)
         else:   # Max-val window peak search
             # debug = voltage // 1000 == 3
             debug=False
@@ -206,7 +229,7 @@ def gen_bi_plot_data(data, do_print=True, prominence=1,
                 plt.title(f'Voltage {voltage}'); 
                 plt.show();
             peaks = max_val_window_peaks(data[voltage], win_size=win_size, 
-                                         _DEBUG=False)
+                                         _DEBUG=False, window_pad=window_pad)
         peak_data.update({voltage: peaks})
         if do_print:
             print(f'Found {len(peak_data[voltage])} peaks for {voltage} mV')

@@ -6,21 +6,28 @@ Created on Wed Nov 16 10:05:57 2022
 """
 from datetime import datetime
 
+
 mpl.rcParams.update(mpl.rcParamsDefault)
 mpl.rcParams['lines.markersize'] = 1
 
 COLOR_LIST = ['r', 'b', 'g', 'orange']
 
 #%% Single
-am_file = r"C:\Users\owner\Desktop\yonathan\Week 7\singles\a-1.csv"
-# am_file = r"C:\University\Semester G\Lab B2\Week 4\singles\a\a-ramp-1.csv"
+am_file = r"C:\University\Semester G\Lab B2\Week 8\singles\c-control-000.csv"
 
-datas = read_modulated_data(am_file, win_size=20, limit=1, offset=0, cols=[4, 10])
+time_length_secs = 0.1 # in seconds
+total_pixel_length = 10**6
+input_am_frequency = 25 * 10 ** 3 # in Hz
+sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
 
-data = gen_bi_plot_data(datas[0], do_print=False, win_size=400)
+datas = read_modulated_data(am_file, win_size=sample_win_size, limit=1, offset=0, cols=[4, 10])
 
+mval = max([max(vals) for vals in datas[0].values()])
 
-# plot_bi_map(datas, c='r', show=False, marker='.')
+bi_map = plot_bi_map(datas[0], c=color, show=False, marker='.', win_size=sample_win_size,
+                     prominence=mval*0.02, use_find_peaks=True)
+
+# bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
 
 plt.show()
 
@@ -36,9 +43,8 @@ input_am_frequency = 25 * 10 ** 3 # in Hz
 sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
 
 t1 = datetime.now()
-am_files = glob.glob(r"C:\University\Semester G\Lab B2\Week 6\single\b*.csv")
+am_files = glob.glob(r"C:\University\Semester G\Lab B2\Week 8\*\*.csv")
 for i, f in enumerate(am_files):
-    it = (c for c in COLOR_LIST)
     plt.clf()
     
     if 'cascade' in f:
@@ -53,25 +59,36 @@ for i, f in enumerate(am_files):
     if 'overload' in f:
         cols = [4,10,16,22]
         
-    
+    if 'controlled' in f:
+        cols = [4,10,16]
+
+    if 'coupled' in f:
+        cols = [4,10,16]
+
+
     datas = read_modulated_data(f, win_size=sample_win_size, limit=1, offset=0, cols=cols)
 
-    for i in range(2):
+    for i in range(1):
+        it = (c for c in COLOR_LIST)
         for d in datas:
+            mval = max([max(vals) for vals in d.values()])
             color = next(it)
             if i == 0:
                 method='find_peaks'
-                bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
+                bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=mval*0.02, use_find_peaks=True,
+                                     win_size=sample_win_size)
             else:
                 method='max_val'
-                bi_map = plot_bi_map(d, c=color, show=False, marker='.', win_size=sample_win_size)
+                bi_map = plot_bi_map(d, c=color, show=False, marker='.',
+                                     win_size=sample_win_size, window_pad=0.2,
+                                     use_find_peaks=False)
             # bifurcations = find_bifurcations(bi_map, threshold=0.5, back_window=5)
                     
             # for v in bifurcations:
             #     if v[1] < 4:
             #         plt.axvline(x=v[0], color=color, alpha=0.1)
             
-        title = ' '.join(f.split('\\')[-2:])
+        title = ' '.join(f.split('\\')[-2:] + [method])
         plt.title(title)
         plt.xlim(0, 11000)
         plt.ylim(0, 30)
@@ -141,16 +158,3 @@ plt.show()
 
 
 print('Done!')
-
-#%% From JSON
-import json
-mpl.rcParams['lines.markersize'] = 0.1
-
-
-with open(r'C:\Users\owner\Desktop\yonathan\Week 8\test.json', 'r') as f:
-    data = json.loads(f.read())
-
-a = np.asarray(data[0])
-plt.scatter(a[:,0], a[:,1], color='r')
-plt.show()
-# print(a)

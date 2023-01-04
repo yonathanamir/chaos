@@ -9,7 +9,7 @@ import pyvisa as visa
 
 
 class VisaDevice:
-    def __init__(self, visa_address, timeout=10000, encoding='latin_1',
+    def __init__(self, visa_address, timeout=1000, encoding='latin_1',
                  read_termination='\n', write_termination=None):
         self.visa_address = visa_address
         self.rm = visa.ResourceManager()

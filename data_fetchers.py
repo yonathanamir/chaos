@@ -30,12 +30,25 @@ class DataFetcher:
         return self._data
 
 
-class ScopeDataFetcher(DataFetcher, VisaDevice):
-    def __init__(self, visa_address, channels_to_sample):
-        super(VisaDevice).__init__(visa_address=visa_address)
+class ScopeDataFetcher(VisaDevice):
+    def __init__(self, visa_address, channels_to_sample, output_lim):
+        super().__init__(visa_address=visa_address)
         self.scope = self.device
 
         self.channels_to_sample = channels_to_sample
+        
+        print(output_lim)
+        
+        # self.output_lim = output_lim
+        
+        # self.offset = self.output_lim[0]
+        # self.scale = max((self.output_lim[1]-self.output_lim[0])/10, 0.2)
+        
+        
+        # for i in range(1, self.channels_to_sample, 1):
+        #     self.scope.write(f'ch{i+1}:offset {self.offset}')
+        #     self.scope.write(f'ch{i+1}:scale {self.scale}')
+        
         self.dummy = None
         
         self.rm = visa.ResourceManager()
@@ -48,10 +61,8 @@ class ScopeDataFetcher(DataFetcher, VisaDevice):
         input_v = self._sample_channel(1)
         measured_data = []
         for i in range(1, self.channels_to_sample, 1):
-            try:
-                measured_data.append(self._sample_channel(i+1))
-            except:
-                measured_data.append(self.dummy)
+            sampled = self._sample_channel(i+1)
+            measured_data.append(sampled)
         
         return np.asarray(input_v), np.asarray(measured_data)
     

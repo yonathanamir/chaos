@@ -254,6 +254,12 @@ def extract_peaks(x, prominence=0.5, win_size = None):
 
     return list(set(peak_vals))
 
+# def statistical_extract_peaks(data, prominence, distance)
+#     inner_window = 10
+#     peak_indices, _ = signal.find_peaks(datas[i], prominence=prominence, distance=distance)
+
+
+
 
 def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
                          window_pad = 0):

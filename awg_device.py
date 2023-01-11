@@ -6,6 +6,7 @@ Created on Fri Dec 30 02:10:13 2022
 """
 
 from visa_device import VisaDevice
+import time
 
 
 class AwgDevice(VisaDevice):
@@ -20,6 +21,7 @@ class AwgDevice(VisaDevice):
     @voltage.setter
     def voltage(self, value):
         self.device.write(f'volt {round(value, 3)}')
+        time.sleep(0.001)
     
     
     @property
@@ -28,3 +30,4 @@ class AwgDevice(VisaDevice):
     @frequency.setter
     def frequency(self, value):
         self.device.write(f'freq {round(value, 3)}')
+        time.sleep(0.001)

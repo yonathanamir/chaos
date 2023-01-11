@@ -10,6 +10,7 @@ import time
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 import os
 
 import chaosv2
@@ -42,10 +43,15 @@ def init_args(args):
     parser.add_argument('--v-max', type=float, default=10.0)
     parser.add_argument('--v-num', type=int, default=100)
 
+    parser.add_argument('--freq', type=float, default=25.0e3)
     parser.add_argument('--freq-sweep', action='store_true')
     parser.add_argument('--freq-min', type=float, default=10.0e3)
     parser.add_argument('--freq-max', type=float, default=40.0e3)
     parser.add_argument('--freq-num', type=int, default=100)
+    
+    parser.add_argument('--draw', action='store_true')
+    parser.add_argument('--save', action='store_true')
+    parser.add_argument('--save-path', type=str)
     
     return parser.parse_args(args)
 
@@ -88,7 +94,6 @@ def do_main(args):
 
     all_peaks = {}
     while True:
-        # try:
         def v_sweep(freq=None):
             for v in np.linspace(args.v_min, args.v_max, args.v_num):
                 awg.voltage = v
@@ -100,35 +105,44 @@ def do_main(args):
                     for i in range(0, len(datas)):
                         # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
                         peaks = chaosv2.extract_peaks(datas[i], prominence=1)
-                        print(peaks)
+
                         all_peaks[v] += list(peaks)
+                        if args.draw:
+                            if args.freq_sweep:
+                                pass
+                                # ax.set_offsets(np.c_[
+                                #                             v * np.ones(len(peaks)),
+                                #                             peaks,
+                                #                             freq * np.ones(len(peaks))
+                                #                         ])
+                                # fig.canvas.draw()
+                                # fig.canvas.flush_events()
+                            else:
+                                xs = []
+                                ys = []
+                                for v in all_peaks.keys():
+                                    xs += list(v*np.ones(len(all_peaks[v])))
+                                    ys += all_peaks[v]
+                                
+                                ax.scatter(xs, ys, color='k')
+                                # scatters[i].set_offsets(np.c_[v*np.ones(len(peaks)), peaks])
+                                fig.canvas.draw()
+                                fig.canvas.flush_events()
+                                
+                    if args.save:
                         if args.freq_sweep:
-                            pass
-                            # ax.set_offsets(np.c_[
-                            #                             v * np.ones(len(peaks)),
-                            #                             peaks,
-                            #                             freq * np.ones(len(peaks))
-                            #                         ])
-                            # fig.canvas.draw()
-                            # fig.canvas.flush_events()
+                            filename = os.path.join(args.save_path, f"freq-{freq}.json")
+                            with open(filename, 'w') as f:
+                                f.write(json.dumps(all_peaks))
                         else:
-                            xs = []
-                            ys = []
-                            for v in all_peaks.keys():
-                                xs += list(v*np.ones(len(all_peaks[v])))
-                                ys += all_peaks[v]
-                            
-                            ax.scatter(xs, ys, color='k')
-                            # scatters[i].set_offsets(np.c_[v*np.ones(len(peaks)), peaks])
-                            fig.canvas.draw()
-                            fig.canvas.flush_events()
+                            pass
 
         if args.freq_sweep:
             for freq in np.linspace(args.freq_min, args.freq_max, args.freq_num):
                 awg.frequency = freq
-                v_sweep()   
+                v_sweep(freq)   
         else:
-            v_sweep()
+            v_sweep(args.freq)
 
         # except Exception as ex:
         #     print(ex)

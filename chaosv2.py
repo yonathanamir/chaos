@@ -90,7 +90,7 @@ def analyze_am_signal(input_voltage, measured_data, win_size, limit=1,
         print('Analyzing AM signal.')
     data=[]
     for i in measured_data:
-        data.append({i})
+        data.append({})
     
     length=len(input_voltage)
     
@@ -118,6 +118,87 @@ def analyze_am_signal(input_voltage, measured_data, win_size, limit=1,
     #     return data[0]
     
     return np.asarray(data)
+
+
+def bi_data_from_am_file_single_window(am_file, cols, win_size, win_pad=0, 
+                                       prominence_weight=0.1, epsilon_factor=0.02,
+                                       do_print=True, 
+                                       auto_offset=False):
+    if do_print:
+        print(f'Reading modulated file {am_file} - NEW!!!')
+    cols_data = read_data(am_file, col=cols, do_print=do_print)
+    input_v = cols_data[0]
+    measured_data = cols_data[1:]
+    
+    results = []
+    for d in measured_data:
+        results.append({})
+
+    offsets = np.zeros(len(measured_data), int)
+    if auto_offset:
+        inner_window = 0.3
+        for i, data in enumerate(measured_data):
+            epsilon = np.array(data[0:win_size]).max() * epsilon_factor
+            for j in range(0, win_size):
+                sub_data = data[j:j+win_size]
+
+                if np.all(sub_data[0:int(len(sub_data)*inner_window)] < epsilon) and \
+                    np.all(sub_data[int(len(sub_data)*(1-inner_window)):len(sub_data)] < epsilon):
+                    offsets[i] = j
+                    break
+    # init_window = 0.4
+
+    # if auto_offset:
+    #     for i, d in enumerate(measured_data):
+    #         epsilon = np.array(d[0:win_size]).max() * epsilon_factor
+
+    #         if not np.all(d[0:int(win_size*init_window)] < epsilon):
+    #             for j in range(int(win_size*init_window), win_size):
+    #                 if np.all(d[j-int(win_size*init_window):j] < epsilon):
+    #                     offsets[i] = j
+    #                     break
+        
+    for j, data in enumerate(measured_data):
+        epsilon = np.max(data) * epsilon_factor
+        for i in range(offsets[j], len(input_v), win_size):
+            min_i = max(0, int(i-(win_size*win_pad)))
+            max_i = min(len(input_v), int(i+(1+win_pad)*win_size))
+            
+            v = max(np.abs(input_v[min_i:max_i]))
+            if v not in results[j]:
+                results[j][v] = []
+                
+            sub_data = data[min_i:max_i]
+
+            plt.plot(sub_data)
+            plt.ylim(-1,10)
+            plt.title(f"v={v},[{min_i}:{max_i}]")
+            plt.show()
+
+            # prominence = prominence_weight*max(np.abs(sub_data))
+            # peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
+            # results[j][v] += [sub_data[i] for i in peak_indices]
+            
+            peak = np.max(sub_data)
+            if peak > epsilon:
+                results[j][v] += [peak]
+        
+    return results
+
+
+def flatten_peak_data(peak_data):
+    vals = []
+    for x in np.asarray([
+     [[voltage, peak] for peak in peak_data[voltage]]
+     for voltage in peak_data.keys()
+     ], dtype=object):
+        if x != []:
+            for y in x:
+                vals.append(y)
+    res = np.array(vals)
+    return res[:,0], res[:,1]
+                
+
 
 def multiprocess_analyzer_am_signal(input_voltage, measured_data, 
                                     win_size, limit=1, offset=0, stride=1, 
@@ -315,3 +396,5 @@ def find_bifurcations(bi_map, threshold = 1, back_window=1):
 def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
     dt = total_time_length / total_pixel_length
     return int(1 / (input_am_frequency * dt))
+
+# %%

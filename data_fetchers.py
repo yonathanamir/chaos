@@ -35,20 +35,7 @@ class ScopeDataFetcher(VisaDevice):
         super().__init__(visa_address=visa_address)
         self.scope = self.device
 
-        self.channels_to_sample = channels_to_sample
-        
-        print(output_lim)
-        
-        # self.output_lim = output_lim
-        
-        # self.offset = self.output_lim[0]
-        # self.scale = max((self.output_lim[1]-self.output_lim[0])/10, 0.2)
-        
-        
-        # for i in range(1, self.channels_to_sample, 1):
-        #     self.scope.write(f'ch{i+1}:offset {self.offset}')
-        #     self.scope.write(f'ch{i+1}:scale {self.scale}')
-        
+        self.channels_to_sample = channels_to_sample        
         self.dummy = None
         
         self.rm = visa.ResourceManager()

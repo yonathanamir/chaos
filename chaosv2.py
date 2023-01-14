@@ -129,7 +129,17 @@ def bi_data_from_am_file_single_window(am_file, cols, win_size, win_pad=0,
     cols_data = read_data(am_file, col=cols, do_print=do_print)
     input_v = cols_data[0]
     measured_data = cols_data[1:]
-    
+        
+    return bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=win_pad, 
+                                                prominence_weight=prominence_weight, epsilon_factor=epsilon_factor,
+                                                do_print=do_print, 
+                                                auto_offset=auto_offset)
+
+
+def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=0, 
+                                       prominence_weight=0.1, epsilon_factor=0.02,
+                                       do_print=True, 
+                                       auto_offset=False):
     results = []
     for d in measured_data:
         results.append({})
@@ -146,17 +156,6 @@ def bi_data_from_am_file_single_window(am_file, cols, win_size, win_pad=0,
                     np.all(sub_data[int(len(sub_data)*(1-inner_window)):len(sub_data)] < epsilon):
                     offsets[i] = j
                     break
-    # init_window = 0.4
-
-    # if auto_offset:
-    #     for i, d in enumerate(measured_data):
-    #         epsilon = np.array(d[0:win_size]).max() * epsilon_factor
-
-    #         if not np.all(d[0:int(win_size*init_window)] < epsilon):
-    #             for j in range(int(win_size*init_window), win_size):
-    #                 if np.all(d[j-int(win_size*init_window):j] < epsilon):
-    #                     offsets[i] = j
-    #                     break
         
     for j, data in enumerate(measured_data):
         epsilon = np.max(data) * epsilon_factor
@@ -253,12 +252,6 @@ def extract_peaks(x, prominence=0.5, win_size = None):
             peak_vals += [sub_data[i] for i in peak_indices]
 
     return list(set(peak_vals))
-
-# def statistical_extract_peaks(data, prominence, distance)
-#     inner_window = 10
-#     peak_indices, _ = signal.find_peaks(datas[i], prominence=prominence, distance=distance)
-
-
 
 
 def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
@@ -402,5 +395,3 @@ def find_bifurcations(bi_map, threshold = 1, back_window=1):
 def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
     dt = total_time_length / total_pixel_length
     return int(1 / (input_am_frequency * dt))
-
-# %%

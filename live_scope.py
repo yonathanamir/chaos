@@ -58,6 +58,14 @@ def init_args(args):
     parser.add_argument('--freq-min', type=float, default=10.0e3)
     parser.add_argument('--freq-max', type=float, default=40.0e3)
     parser.add_argument('--freq-num', type=int, default=100)
+
+    parser.add_argument('--time_length_secs', type=float, default=10.0e3)
+    parser.add_argument('--total-pixel_length', type=float, default=40.0e3)
+    parser.add_argument('--input-am-frequency', type=int, default=100)
+    
+    # time_length_secs = 4e-3 # in seconds
+    # total_pixel_length = 10**5
+    # input_am_frequency = 25 * 10 ** 3 # in Hz
     
     parser.add_argument('--draw', action='store_true')
     parser.add_argument('--mesh', action='store_true')
@@ -99,15 +107,48 @@ def do_main(args):
         for i in range(args.channels_to_sample):
             scatters.append(ax.scatter([], [], c=COLOR_MAP[i], marker=args.marker))
 
-    # TODO: get from scope
-    time_length_secs = 4e-3 # in seconds
-    total_pixel_length = 10**5
-    input_am_frequency = 25 * 10 ** 3 # in Hz
-    sample_win_size = calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
-
     while True:
         def v_sweep(args, freq=None):
-            all_peaks = {}            
+
+            if args.v_am:
+                # TODO: get from scope?
+                sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, args.input_am_frequency)
+
+                # TODO: Set AM voltage through AWG device
+
+                input("Fix Trigger on oscilloscope and enter anything to continue.")
+                input_v, datas = data_fetcher.get_data()
+
+                peak_datas = chaosv2.bi_data_from_am_data_single_window(input_v, datas, 
+                                                        win_size=sample_win_size, 
+                                                        win_pad=0.0,
+                                                        prominence_weight=0.1,
+                                                        auto_offset=True,
+                                                        do_print=False)
+
+                if args.draw:
+                    for i, d in enumerate(peak_datas):
+                        xs, ys = chaosv2.flatten_peak_data(d)
+
+                        if args.freq_sweep:
+                            zs += list(freq*np.ones(len(ys)))
+                            ax.scatter(xs, ys, zs, color='k', s=args.marker_size)
+                        else:
+                            ax.scatter(xs, ys, color='k', s=args.marker_size, label=i)
+                            fig.canvas.flush_events()
+                        fig.canvas.draw()
+                                
+                    if args.save and not args.freq_sweep:
+                        filename = os.path.join(args.save_path, f"freq-{int(freq)}.json")
+                        with open(filename, 'w') as f:
+                            f.write(json.dumps(peak_datas))                    
+
+                return peak_datas
+
+            # TODO: get from scope?
+            sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, freq)
+
+            all_peaks = {}
             awg.voltage = args.v_min
             print(f'Setting min v={args.v_min}')
             time.sleep(1)
@@ -122,7 +163,7 @@ def do_main(args):
 
                     for i in range(0, len(datas)):
                         curr_max_v = np.max(datas[i])
-                        # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)                        
+                        # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
                         # peaks = chaosv2.extract_peaks(datas[i], prominence=1)
                         peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=int(sample_win_size//2))
                         peaks = list(np.unique([datas[i][index] for index in peak_indices]))
@@ -135,23 +176,20 @@ def do_main(args):
                             zs = []
                             xs += list(v*np.ones(len(peaks)))
                             ys += peaks
-
+                                
                             if args.freq_sweep:
                                 zs += list(freq*np.ones(len(peaks)))
-                            
-                            if not args.freq_sweep:
-                                ax.scatter(xs, ys, color='k', s=args.marker_size)
-                            else:
                                 ax.scatter(xs, ys, zs, color='k', s=args.marker_size)
-                                
-                            fig.canvas.flush_events()
+                            else:
+                                ax.scatter(xs, ys, color='k', s=args.marker_size)
+                                fig.canvas.flush_events()
                             fig.canvas.draw()
                                 
                     if args.save and not args.freq_sweep:
                         filename = os.path.join(args.save_path, f"freq-{int(freq)}.json")
                         with open(filename, 'w') as f:
                             f.write(json.dumps(all_peaks))
-                    
+
             return all_peaks
 
         t1 = datetime.now()
@@ -192,4 +230,5 @@ if __name__ == '__main__':
     import sys
     
     args = init_args(sys.argv[1:])
-    do_main(args)    
+    do_main(args)
+    

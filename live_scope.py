@@ -62,6 +62,9 @@ def init_args(args):
     parser.add_argument('--time_length_secs', type=float, default=10.0e3)
     parser.add_argument('--total-pixel_length', type=float, default=40.0e3)
     parser.add_argument('--input-am-frequency', type=int, default=100)
+
+    parser.add_argument('--distance', type=int, default=50)
+    parser.add_argument('--peak-window', type=int, default=3)
     
     # time_length_secs = 4e-3 # in seconds
     # total_pixel_length = 10**5
@@ -165,8 +168,13 @@ def do_main(args):
                         curr_max_v = np.max(datas[i])
                         # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
                         # peaks = chaosv2.extract_peaks(datas[i], prominence=1)
-                        peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=int(sample_win_size//2))
-                        peaks = list(np.unique([datas[i][index] for index in peak_indices]))
+                        # peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=int(sample_win_size//2))
+                        # peaks = list(np.unique([datas[i][index] for index in peak_indices]))
+
+                        peaks, indices = chaosv2.extract_peaks_prob(datas[i], peak_window=args.distance, distance=args.distance)
+                        fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
+                        peaks = fixed
+
                         print(f'Found {len(peaks)} for freq={freq}, v={v}.')
 
                         all_peaks[v] += peaks

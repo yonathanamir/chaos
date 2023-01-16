@@ -18,12 +18,16 @@ import chaosv2
 
 
 mpl.rcParams.update(mpl.rcParamsDefault)
-mpl.rcParams['lines.markersize'] = 0.2
+mpl.rcParams['lines.markersize'] = 1
 
 COLOR_LIST = ['r', 'b', 'g', 'orange']
 DIODES = ['A', 'B', 'C', 'D', 'E']
 
 print("Done init.")
+
+# %%
+
+# %%
 
 #%% New Single
 am_file = r"C:\University\Semester G\Lab B2\Week 8\coupled\ab-control-100.csv"
@@ -277,4 +281,24 @@ print(f'Done! {t2-t1}')
 
 # print('Done!')
 
+# %% Hi res
+file = r"C:\University\Semester G\Lab B2\Week 8\coupled\bc-control-000.csv"
+
+cols = [16]
+cols_data = chaosv2.read_data(file, col=cols, do_print=False)
+input_v = np.array(cols_data)
+
+peaks, indices = chaosv2.extract_peaks_prob(input_v, peak_window=3, distance=50)
+
+fixed = peaks + np.average(input_v[indices] - peaks)
+orig_peaks = input_v[indices]
+
+# plt.scatter(np.arange(len(indices)), peaks, label="prob peaks")
+plt.scatter(np.arange(len(indices)), orig_peaks, label="original peaks")
+# plt.scatter(np.arange(len(indices)), fixed, label="fixed prob")
+plt.legend()
+
+print(f'# of peaks: {len(indices)}')
+print(f'Unique original peaks: {len(set(orig_peaks))}')
+print(f'Unique fixed peaks: {len(set(fixed))}')
 # %%

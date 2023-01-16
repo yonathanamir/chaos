@@ -234,6 +234,24 @@ def multiprocess_analyzer_am_signal(input_voltage, measured_data,
     return final
     
 
+def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=100):
+    ret_peak_vals = []
+    ret_peak_indices = []
+    prom = np.max(data)*prominence_epsilon
+    peak_indices, _ = signal.find_peaks(data, prominence=prom, distance=distance)
+    for peak_i in peak_indices:
+        prob_peak = np.average(data[peak_i-peak_window:peak_i+peak_window])
+
+        if prob_peak > data[peak_i]:
+            print(peak_i)
+
+        if prob_peak > 0:
+            ret_peak_indices += [peak_i]
+            ret_peak_vals += [prob_peak]
+
+    return np.array(ret_peak_vals), ret_peak_indices
+
+
 def extract_peaks(x, prominence=0.5, win_size = None):
     if win_size is None:
         peak_indices = signal.find_peaks(x, prominence=prominence)[0]

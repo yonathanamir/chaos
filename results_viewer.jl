@@ -59,6 +59,7 @@ function gen_3d_plot(df, click_data)
 
     if isnothing(click_data)
         return Plot(trace, layout)
+    end
 
     clicked_freq = click_data["points"][1].x
     clicked_volt = click_data["points"][1].y
@@ -72,7 +73,7 @@ function gen_3d_plot(df, click_data)
 
 
         
-    return plt
+    return Plot(trace, layout)
 end
 
 app = dash()
@@ -97,7 +98,7 @@ dark_mode_style = Dict(
 # style=vertical_graph_style
 app.layout = html_div(style=dark_mode_style) do
     (html_div(style=vertical_graph_style) do 
-        dcc_graph(id = "input-bi-map", figure=gen_3d_plot(df))
+        dcc_graph(id = "input-bi-map", figure=gen_3d_plot(df, nothing))
     end),
     
     (html_div(id = "plane-divs") do

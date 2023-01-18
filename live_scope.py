@@ -49,6 +49,7 @@ def init_args(args):
 
     parser.add_argument('--prominence-epsilon', type=float, default=1/20)
 
+    parser.add_argument('--v-am', action="store_true")
     parser.add_argument('--v-min', type=float, default=0.1)
     parser.add_argument('--v-max', type=float, default=10.0)
     parser.add_argument('--v-num', type=int, default=100)
@@ -59,12 +60,13 @@ def init_args(args):
     parser.add_argument('--freq-max', type=float, default=40.0e3)
     parser.add_argument('--freq-num', type=int, default=100)
 
-    parser.add_argument('--time_length_secs', type=float, default=10.0e3)
-    parser.add_argument('--total-pixel_length', type=float, default=40.0e3)
-    parser.add_argument('--input-am-frequency', type=int, default=100)
+    parser.add_argument('--time-length-secs', type=float, default=1.0e-3)
+    parser.add_argument('--total-pixel-length', type=float, default=10.0e3)
+    parser.add_argument('--input-am-frequency', type=int, default=10)
 
+    parser.add_argument('--peak-mode', type=str, default="area")
     parser.add_argument('--distance', type=int, default=50)
-    parser.add_argument('--peak-window', type=int, default=3)
+    parser.add_argument('--peak-window', type=int, default=10)
     
     # time_length_secs = 4e-3 # in seconds
     # total_pixel_length = 10**5
@@ -89,16 +91,17 @@ def do_main(args):
 
     if args.freq_sweep:
         ax = plt.axes(projection='3d')
-        ax.set_zlim([args.freq_min, args.freq_max])
-        ax.set_zlabel("AC Frequency (Hz)")
+        ax.set_ylim([args.freq_min, args.freq_max])
+        ax.set_ylabel("AC Frequency (Hz)")
+        ax.set_zlim(args.ylim)
+        ax.set_zlabel("Diode Voltage")
     else:
         ax = fig.add_subplot(111)
+        ax.set_ylim(args.ylim)
+        ax.set_ylabel("Diode Voltage")
 
     ax.set_xlim([args.v_min, args.v_max])
     ax.set_xlabel("Input Voltage")
-
-    ax.set_ylim(args.ylim)
-    ax.set_ylabel("Diode Voltage")
     
     mpl.rcParams['lines.markersize'] = args.marker_size
 
@@ -115,18 +118,21 @@ def do_main(args):
 
             if args.v_am:
                 # TODO: get from scope?
-                sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, args.input_am_frequency)
+                sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, freq)
+                print(f"Window: {sample_win_size}")
 
                 # TODO: Set AM voltage through AWG device
+                awg.set_ramp(am_freq=10)
 
-                input("Fix Trigger on oscilloscope and enter anything to continue.")
+                # input("Fix Trigger on oscilloscope and enter anything to continue.")
+                time.sleep(0.5)
                 input_v, datas = data_fetcher.get_data()
 
                 peak_datas = chaosv2.bi_data_from_am_data_single_window(input_v, datas, 
                                                         win_size=sample_win_size, 
                                                         win_pad=0.0,
                                                         prominence_weight=0.1,
-                                                        auto_offset=True,
+                                                        auto_offset=False,
                                                         do_print=False)
 
                 if args.draw:
@@ -134,11 +140,11 @@ def do_main(args):
                         xs, ys = chaosv2.flatten_peak_data(d)
 
                         if args.freq_sweep:
-                            zs += list(freq*np.ones(len(ys)))
-                            ax.scatter(xs, ys, zs, color='k', s=args.marker_size)
+                            zs = list(freq*np.ones(len(ys)))
+                            ax.scatter(xs, zs, ys, color='k', s=args.marker_size)
                         else:
                             ax.scatter(xs, ys, color='k', s=args.marker_size, label=i)
-                            fig.canvas.flush_events()
+                        fig.canvas.flush_events()
                         fig.canvas.draw()
                                 
                     if args.save and not args.freq_sweep:
@@ -168,12 +174,22 @@ def do_main(args):
                         curr_max_v = np.max(datas[i])
                         # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
                         # peaks = chaosv2.extract_peaks(datas[i], prominence=1)
-                        # peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=int(sample_win_size//2))
-                        # peaks = list(np.unique([datas[i][index] for index in peak_indices]))
 
-                        peaks, indices = chaosv2.extract_peaks_prob(datas[i], peak_window=args.distance, distance=args.distance)
-                        fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
-                        peaks = fixed
+                        if args.peak_mode == "normal":
+                            peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=args.distance)
+                            peaks = list(np.unique([datas[i][index] for index in peak_indices]))
+                        elif args.peak_mode == "prob":
+                            peaks, indices = chaosv2.extract_peaks_prob(datas[i], peak_window=args.peak_window, distance=args.distance)
+                            # fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
+                            # peaks = list(fixed)
+                            peaks = list(peaks)
+                        elif args.peak_mode == "area":
+                            peaks, indices = chaosv2.extract_peaks_areas(datas[i], peak_window=args.peak_window, distance=args.distance )
+                            # fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
+                            # peaks = list(fixed)
+                            peaks = list(peaks)
+                        else:
+                            raise Exception("Bad peak mode!")
 
                         print(f'Found {len(peaks)} for freq={freq}, v={v}.')
 
@@ -182,15 +198,16 @@ def do_main(args):
                             xs = []
                             ys = []
                             zs = []
+
                             xs += list(v*np.ones(len(peaks)))
                             ys += peaks
                                 
                             if args.freq_sweep:
                                 zs += list(freq*np.ones(len(peaks)))
-                                ax.scatter(xs, ys, zs, color='k', s=args.marker_size)
+                                ax.scatter(xs, zs, ys, color='k', s=args.marker_size)
                             else:
                                 ax.scatter(xs, ys, color='k', s=args.marker_size)
-                                fig.canvas.flush_events()
+                            fig.canvas.flush_events()
                             fig.canvas.draw()
                                 
                     if args.save and not args.freq_sweep:

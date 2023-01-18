@@ -282,23 +282,43 @@ print(f'Done! {t2-t1}')
 # print('Done!')
 
 # %% Hi res
-file = r"C:\University\Semester G\Lab B2\Week 8\coupled\bc-control-000.csv"
+# file = r"C:\University\Semester G\Lab B2\Week 8\singles\c-control-000.csv"
+file = r"C:\University\Semester G\Lab B2\Week 11\1mpoints.csv"
 
-cols = [16]
+mpl.rcParams['lines.markersize'] = 1
+
+cols = [4]
 cols_data = chaosv2.read_data(file, col=cols, do_print=False)
 input_v = np.array(cols_data)
 
-peaks, indices = chaosv2.extract_peaks_prob(input_v, peak_window=3, distance=50)
+prob_peaks, prob_indices = chaosv2.extract_peaks_prob(input_v, peak_window=3, distance=50)
 
-fixed = peaks + np.average(input_v[indices] - peaks)
-orig_peaks = input_v[indices]
+orig_peaks_probs = input_v[prob_indices]
+prob_fixed = prob_peaks + np.average(input_v[prob_indices] - prob_peaks)
 
-# plt.scatter(np.arange(len(indices)), peaks, label="prob peaks")
-plt.scatter(np.arange(len(indices)), orig_peaks, label="original peaks")
-# plt.scatter(np.arange(len(indices)), fixed, label="fixed prob")
+plt.scatter(np.arange(len(prob_indices)), orig_peaks_probs, label="original prob peaks")
 plt.legend()
+plt.show()
 
-print(f'# of peaks: {len(indices)}')
-print(f'Unique original peaks: {len(set(orig_peaks))}')
-print(f'Unique fixed peaks: {len(set(fixed))}')
+plt.scatter(np.arange(len(prob_indices)), prob_fixed, label="fixed prob")
+plt.legend()
+plt.show()
+
+
+peak_window = 10
+area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window)
+orig_peaks_area = input_v[area_indices]
+plt.scatter(np.arange(len(area_indices)), area_peaks, label="area fixed window")
+plt.legend()
+plt.show()
+
+area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, peak_window=peak_window)
+orig_peaks_area = input_v[area_indices]
+plt.scatter(np.arange(len(area_indices)), area_peaks, label="area variable window")
+plt.legend()
+plt.show()
+
+# print(f'# of peaks: {len(indices)}')
+# print(f'Unique original peaks: {len(set(orig_peaks))}')
+# print(f'Unique fixed peaks: {len(set(fixed))}')
 # %%

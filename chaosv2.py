@@ -234,6 +234,39 @@ def multiprocess_analyzer_am_signal(input_voltage, measured_data,
     return final
     
 
+def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon=0.01, fixed_window=False, peak_window=10):
+    ret_peak_vals = []
+    ret_peak_indices = []
+
+    maxval = np.max(data)
+    prom = maxval*prominence_epsilon
+    zero = maxval*zero_epsilon
+
+    peak_indices, _ = signal.find_peaks(data, prominence=prom, distance=distance)
+    for peak_i in peak_indices:
+        left = max(0, peak_i-peak_window)
+        right = min(len(data), peak_i+peak_window)
+
+        if not fixed_window:
+            for i in range(peak_i-1, max(0, peak_i-peak_window), -1):
+                if data[i] < zero:
+                    left = i
+                    break
+                
+            for i in range(peak_i+1, min(len(data), peak_i+peak_window), 1):
+                if data[i] < zero:
+                    right = i
+                    break
+
+        area_peak = np.trapz(data[left:right]) / maxval
+
+        if area_peak > 0:
+            ret_peak_indices += [peak_i]
+            ret_peak_vals += [area_peak]
+
+    return np.array(ret_peak_vals), ret_peak_indices
+    
+
 def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=100):
     ret_peak_vals = []
     ret_peak_indices = []
@@ -241,9 +274,6 @@ def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=10
     peak_indices, _ = signal.find_peaks(data, prominence=prom, distance=distance)
     for peak_i in peak_indices:
         prob_peak = np.average(data[peak_i-peak_window:peak_i+peak_window])
-
-        if prob_peak > data[peak_i]:
-            print(peak_i)
 
         if prob_peak > 0:
             ret_peak_indices += [peak_i]

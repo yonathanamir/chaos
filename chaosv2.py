@@ -234,7 +234,7 @@ def multiprocess_analyzer_am_signal(input_voltage, measured_data,
     return final
     
 
-def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon=0.01, fixed_window=False, peak_window=10):
+def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon=0.01, fixed_window=False, peak_window=10, normalize=False):
     ret_peak_vals = []
     ret_peak_indices = []
 
@@ -263,8 +263,10 @@ def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon
         if area_peak > 0:
             ret_peak_indices += [peak_i]
             ret_peak_vals += [area_peak]
-
-    return np.array(ret_peak_vals), ret_peak_indices
+    ret_peak_vals = np.array(ret_peak_vals)
+    if normalize:
+        ret_peak_vals *= maxval / np.max(ret_peak_vals)
+    return ret_peak_vals, ret_peak_indices
     
 
 def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=100):

@@ -283,9 +283,9 @@ print(f'Done! {t2-t1}')
 
 # %% Hi res
 # file = r"C:\University\Semester G\Lab B2\Week 8\singles\c-control-000.csv"
-file = r"C:\University\Semester G\Lab B2\Week 11\1mpoints.csv"
+file = r"C:\University\Semester G\Lab B2\Week 11\10kpoints.csv"
 
-mpl.rcParams['lines.markersize'] = 1
+mpl.rcParams['lines.markersize'] = 0.5
 
 cols = [4]
 cols_data = chaosv2.read_data(file, col=cols, do_print=False)
@@ -306,19 +306,28 @@ plt.show()
 
 
 peak_window = 10
-area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window)
-orig_peaks_area = input_v[area_indices]
-plt.scatter(np.arange(len(area_indices)), area_peaks, label="area fixed window")
-plt.legend()
-plt.show()
+# area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window)
+# orig_peaks_area = input_v[area_indices]
+# plt.scatter(np.arange(len(area_indices)), area_peaks, label="area fixed window")
+# plt.legend()
+# plt.show()
 
-area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, peak_window=peak_window)
-orig_peaks_area = input_v[area_indices]
-plt.scatter(np.arange(len(area_indices)), area_peaks, label="area variable window")
+normalized_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window, normalize=True)
+plt.scatter(np.arange(len(area_indices)), normalized_peaks, label="normalized area")
 plt.legend()
 plt.show()
 
 # print(f'# of peaks: {len(indices)}')
 # print(f'Unique original peaks: {len(set(orig_peaks))}')
 # print(f'Unique fixed peaks: {len(set(fixed))}')
+# %%
+
+# %%
+
+# %%
+
+# %%
+
+# %%
+
 # %%

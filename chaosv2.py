@@ -169,10 +169,10 @@ def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad
                 
             sub_data = data[min_i:max_i]
 
-            plt.plot(sub_data)
-            plt.ylim(-1,10)
-            plt.title(f"v={v},[{min_i}:{max_i}]")
-            plt.show()
+            # plt.plot(sub_data)
+            # plt.ylim(-1,10)
+            # plt.title(f"v={v},[{min_i}:{max_i}]")
+            # plt.show()
 
             # prominence = prominence_weight*max(np.abs(sub_data))
             # peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
@@ -258,14 +258,15 @@ def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon
                     right = i
                     break
 
-        area_peak = np.trapz(data[left:right]) / maxval
+        area_peak = np.trapz(data[left:right])
 
         if area_peak > 0:
             ret_peak_indices += [peak_i]
             ret_peak_vals += [area_peak]
     ret_peak_vals = np.array(ret_peak_vals)
     if normalize:
-        ret_peak_vals *= maxval / np.max(ret_peak_vals)
+        # ret_peak_vals *= maxval / np.max(ret_peak_vals)
+        ret_peak_vals /= peak_window*2
     return ret_peak_vals, ret_peak_indices
     
 
@@ -331,9 +332,9 @@ def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
     
     if do_print:
         print(f'Plotting...')
-    plt.scatter(vals[:,0], vals[:,1], c=c, marker=marker, label=label)
+    plt.scatter(vals[:,0]/1000, vals[:,1], c=c, marker=marker, label=label)
 
-    plt.xlabel('Input Voltage (mV)')
+    plt.xlabel('Input Voltage (V)')
     plt.ylabel('Diode Voltage values (V)')
     if show:
         plt.show()

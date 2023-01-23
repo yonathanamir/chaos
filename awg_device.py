@@ -16,18 +16,22 @@ class AwgDevice(VisaDevice):
         # TODO: AC Base Commands
 
     @property
+    @VisaDevice.reconnect_method
     def voltage(self):
         return self.device.query(f'volt?')
     @voltage.setter
+    @VisaDevice.reconnect_method
     def voltage(self, value):
         self.device.write(f'volt {round(value, 3)}')
         time.sleep(0.001)
     
     
     @property
+    @VisaDevice.reconnect_method
     def frequency(self):
         return self.device.query('freq?')
     @frequency.setter
+    @VisaDevice.reconnect_method
     def frequency(self, value):
         self.device.write(f'freq {round(value, 3)}')
         time.sleep(0.001)

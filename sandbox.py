@@ -25,12 +25,8 @@ DIODES = ['A', 'B', 'C', 'D', 'E']
 
 print("Done init.")
 
-# %%
-
-# %%
-
 #%% New Single
-am_file = r"C:\University\Semester G\Lab B2\Week 8\coupled\ab-control-100.csv"
+am_file = r"C:\University\Semester G\Lab B2\Week 6\single\a-1.csv"
 
 time_length_secs = 0.1 # in seconds
 total_pixel_length = 10**6
@@ -45,12 +41,10 @@ peak_datas = chaosv2.bi_data_from_am_file_single_window(am_file, cols=[4,10],
                                                         do_print=False)
 for i, d in enumerate(peak_datas):
     xs, ys = chaosv2.flatten_peak_data(d)
-    plt.scatter(xs,ys, label=i)
+    plt.scatter(xs,ys, label=i, color='k', s=0.4, marker='.')
 
-lgnd = plt.legend()
-for handle in lgnd.legendHandles:
-    handle.set_sizes([10])
-
+plt.xlabel('Input Voltage (V)')
+plt.ylabel('Diode Voltage values (V)')
 plt.show()
 
 print('Done!')
@@ -134,26 +128,26 @@ t2 = datetime.now()
 print(f'Done! {t2-t1}')
 
 
-# #%% Single
-# am_file = r"C:\University\Semester G\Lab B2\Week 8\singles\c-control-000.csv"
+#%% Single
+am_file = r"C:\University\Semester G\Lab B2\Week 6\single\a-1.csv"
 
-# time_length_secs = 0.1 # in seconds
-# total_pixel_length = 10**6
-# input_am_frequency = 25 * 10 ** 3 # in Hz
-# sample_win_size = chaosv2.calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
+time_length_secs = 0.1 # in seconds
+total_pixel_length = 10**6
+input_am_frequency = 25 * 10 ** 3 # in Hz
+sample_win_size = chaosv2.calculate_sample_win_size(time_length_secs, total_pixel_length, input_am_frequency)
 
-# datas = chaosv2.read_modulated_data(am_file, win_size=sample_win_size, limit=1, offset=0, cols=[4, 10])
+datas = chaosv2.read_modulated_data(am_file, win_size=sample_win_size, limit=1, offset=0, cols=[4, 10])
 
-# mval = max([max(vals) for vals in datas[0].values()])
+mval = max([max(vals) for vals in datas[0].values()])
 
-# bi_map = chaosv2.plot_bi_map(datas[0], c='r', show=False, marker='.', win_size=sample_win_size,
-#                      prominence=mval*0.02, use_find_peaks=True)
+bi_map = chaosv2.plot_bi_map(datas[0], c='k', show=False, marker='.', win_size=sample_win_size,
+                     prominence=mval*0.02, use_find_peaks=True)
 
-# # bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
+# bi_map = plot_bi_map(d, c=color, show=False, marker='.', prominence=1)
 
-# plt.show()
+plt.show()
 
-# print('Done!')
+print('Done!')
 
 # #%% Folder
 # import os
@@ -282,44 +276,71 @@ print(f'Done! {t2-t1}')
 # print('Done!')
 
 # %% Hi res
-# file = r"C:\University\Semester G\Lab B2\Week 8\singles\c-control-000.csv"
-file = r"C:\University\Semester G\Lab B2\Week 11\10kpoints.csv"
+# file = r"C:\University\Semester G\Lab B2\Week 6\cascade\a-b-c-1.csv"
+file = r"C:\University\Semester G\Lab B2\Week 11\1mpoints.csv"
 
-mpl.rcParams['lines.markersize'] = 0.5
+mpl.rcParams['lines.markersize'] = 1
+
+distance = 500
+peak_window = 10
 
 cols = [4]
 cols_data = chaosv2.read_data(file, col=cols, do_print=False)
 input_v = np.array(cols_data)
 
-prob_peaks, prob_indices = chaosv2.extract_peaks_prob(input_v, peak_window=3, distance=50)
+plt.plot(input_v[0:5000], color='k')
+plt.title("Original Signal (partial)")
+plt.show()
+
+prob_peaks, prob_indices = chaosv2.extract_peaks_prob(input_v, peak_window=peak_window, distance=distance)
 
 orig_peaks_probs = input_v[prob_indices]
 prob_fixed = prob_peaks + np.average(input_v[prob_indices] - prob_peaks)
 
-plt.scatter(np.arange(len(prob_indices)), orig_peaks_probs, label="original prob peaks")
-plt.legend()
+def get_bins(values, epsilon = 1e-2):
+    bins = []
+    for i in np.unique(values):
+        bins += [i-epsilon, i+epsilon]
+    return np.sort(bins)
+
+# plt.scatter(np.arange(len(prob_indices)), orig_peaks_probs, color='k')
+plt.hist(orig_peaks_probs, bins=get_bins(orig_peaks_probs), color='k')
+plt.suptitle(f"Original Peak Values (window={peak_window})")
+plt.title(f"Unique values: {len(set(orig_peaks_probs))}")
 plt.show()
 
-plt.scatter(np.arange(len(prob_indices)), prob_fixed, label="fixed prob")
-plt.legend()
+# plt.scatter(np.arange(len(prob_indices)), prob_fixed, color='k')
+plt.hist(prob_fixed, bins=get_bins(prob_fixed), color='k')
+plt.suptitle(f"Probability Peak Values (window={peak_window})")
+plt.title(f"Unique values: {len(set(prob_fixed))}")
 plt.show()
 
-
-peak_window = 10
 # area_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window)
 # orig_peaks_area = input_v[area_indices]
 # plt.scatter(np.arange(len(area_indices)), area_peaks, label="area fixed window")
 # plt.legend()
 # plt.show()
 
-normalized_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=50, fixed_window=True, peak_window=peak_window, normalize=True)
-plt.scatter(np.arange(len(area_indices)), normalized_peaks, label="normalized area")
-plt.legend()
+normalized_peaks, area_indices = chaosv2.extract_peaks_areas(input_v, distance=distance, fixed_window=True, peak_window=peak_window, normalize=True)
+# plt.scatter(np.arange(len(area_indices)), normalized_peaks, color='k')
+plt.hist(normalized_peaks, bins=get_bins(normalized_peaks), color='k')
+plt.suptitle("Area Peak Values")
+plt.title(f"Unique values: {len(set(normalized_peaks))}")
 plt.show()
 
 # print(f'# of peaks: {len(indices)}')
 # print(f'Unique original peaks: {len(set(orig_peaks))}')
 # print(f'Unique fixed peaks: {len(set(fixed))}')
+
+
+# %%
+
+# %%
+
+# %%
+
+# %%
+
 # %%
 
 # %%
@@ -331,3 +352,67 @@ plt.show()
 # %%
 
 # %%
+
+# %%
+
+# %%
+
+# %%
+
+# %% Presentation
+mpl.rcParams['lines.markersize'] = 1
+from scipy import signal
+
+for i in range(6):
+
+    subdata = np.array(cols_data[330+i*400:350+i*400])
+    # subdata = np.array(cols_data[275+i*400:400+i*400])
+    # indices, _ = signal.find_peaks(subdata)
+    pi = np.argmax(subdata)
+
+    for h in set(subdata):
+        plt.axhline(y=h, color='k', alpha=0.1)
+
+    plt.scatter(np.arange(len(subdata)),subdata, color='k', s=5)
+    plt.scatter(pi,subdata[pi], color='r', s=6)
+    plt.show()
+
+# %%
+
+# %%
+subdata = np.array(cols_data[275:400])
+# subdata -= np.min(subdata)
+
+# Max peak
+plt.scatter(np.arange(len(subdata)),subdata, color='k')
+
+peaks, indices = chaosv2.extract_peaks_prob(subdata, peak_window=peak_window, distance=distance)
+plt.scatter(indices,subdata[indices], color='r', s=3)
+plt.axhline(y=subdata[indices],color='r', alpha=0.5)
+plt.show()
+
+# Prob peak
+plt.scatter(np.arange(len(subdata)),subdata, color='k')
+win_indices = [list(range(i-peak_window,i+peak_window)) for i in indices]
+prob_peak = np.average(subdata[win_indices])
+plt.scatter(win_indices,subdata[win_indices], color='r', s=3)
+plt.axhline(y=prob_peak,color='r', alpha=0.5)
+plt.show()
+
+# Area peak
+plt.scatter(np.arange(len(subdata)),subdata, color='k')
+win_indices = np.array([list(range(i-peak_window,i+peak_window)) for i in indices]).flatten()
+prob_peak = np.average(subdata[win_indices])
+plt.scatter(win_indices,subdata[win_indices], color='r', s=3)
+
+# minval = np.min(subdata)
+plt.fill_between(win_indices, subdata[win_indices], np.zeros(len(win_indices)), color='r', alpha=0.5)
+plt.axhline(y=0,color='k', alpha=0.5)
+
+area_peak = np.trapz(subdata[win_indices])/(win_indices.size-1)
+
+# area_peak = np.trapz(subdata[win_indices])
+
+
+plt.axhline(y=area_peak,color='r', alpha=0.5)
+plt.show()

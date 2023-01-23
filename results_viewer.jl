@@ -6,7 +6,7 @@ using Dash
 using DataFrames
 
 
-f = open("C:\\Users\\Yonathan\\Downloads\\run.json", "r")
+f = open("C:\\University\\Semester G\\Lab B2\\Week 12\\am_sweep.json", "r")
 parsed = JSON.parse(f)
 close(f)
 # print(parsed)
@@ -20,7 +20,7 @@ runs = Run[]
 freqs = collect(parse(Float64, f) for f in keys(parsed))
 
 for f in freqs
-    vs = collect(parse(Float64, v) for v in keys(parsed[string(f)]))
+    vs = collect(parse(Float64, v) for v in keys(parsed[string(f)][1]))
     for v in vs
         append!(runs, [Run(f, v)])
     end
@@ -30,7 +30,10 @@ xs = []
 ys = []
 zs = []
 for run in runs
-    for z in parsed[string(run.f)][string(run.v)]
+        # append!(xs, [run.f])
+        # append!(ys, [run.v])
+        # append!(zs, [maximum(parsed[string(run.f)][1][string(run.v)])])
+    for z in parsed[string(run.f)][1][string(run.v)]
         append!(xs, [run.f])
         append!(ys, [run.v])
         append!(zs, [z])
@@ -43,7 +46,7 @@ df = DataFrame(f=xs,v=ys,z=zs)
 
 function gen_3d_plot(df, click_data)
     marker = attr(
-        size = 2,
+        size = 1,
         color = :black
     )
 

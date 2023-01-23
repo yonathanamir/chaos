@@ -38,12 +38,13 @@ class ScopeDataFetcher(VisaDevice):
         self.channels_to_sample = channels_to_sample        
         self.dummy = None
         
-        self.rm = visa.ResourceManager()
+        # self.rm = visa.ResourceManager()
         
     def __del__(self):
         self.scope.close()
         self.rm.close()
 
+    @VisaDevice.reconnect_method
     def get_data(self):
         input_v = self._sample_channel(1)
         measured_data = []
@@ -53,6 +54,7 @@ class ScopeDataFetcher(VisaDevice):
         
         return np.asarray(input_v), np.asarray(measured_data)
     
+    @VisaDevice.reconnect_method
     def _sample_channel(self, channel):
         # print(f'Sampling channel {channel}')
         self.scope.write('header 0')

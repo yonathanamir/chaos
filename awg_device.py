@@ -12,6 +12,7 @@ import time
 class AwgDevice(VisaDevice):
     def __init__(self, visa_address):
         super().__init__(visa_address=visa_address)
+        self.off_ramp()
 
         # TODO: AC Base Commands
 
@@ -35,3 +36,13 @@ class AwgDevice(VisaDevice):
     def frequency(self, value):
         self.device.write(f'freq {round(value, 3)}')
         time.sleep(0.001)
+
+    def set_ramp(self, am_freq):
+        self.device.write(f'sour:am:stat on')
+        self.device.write(f'sour:am:dept max')
+        self.device.write(f'sour:am:int:freq {am_freq}')
+        self.device.write(f'sour:am:int:func ramp')
+
+    def off_ramp(self):
+        self.device.write(f'sour:am:stat off')
+        

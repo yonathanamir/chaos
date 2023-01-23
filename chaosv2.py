@@ -176,11 +176,13 @@ def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad
 
             # prominence = prominence_weight*max(np.abs(sub_data))
             # peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
-            # results[j][v] += [sub_data[i] for i in peak_indices]
+
+            peaks, indices = extract_peaks_areas(sub_data)
+            results[j][v] += [sub_data[i] for i in indices]
             
-            peak = np.max(sub_data)
-            if peak > epsilon:
-                results[j][v] += [peak]
+            # peak = np.max(sub_data)
+            # # if peak > epsilon:
+            # results[j][v] += [peak]
         
     return results
 

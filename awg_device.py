@@ -13,6 +13,11 @@ class AwgDevice(VisaDevice):
     def __init__(self, visa_address):
         super().__init__(visa_address=visa_address)
         self.off_ramp()
+    
+    def connect(self):
+        super().connect()
+        # self.off_ramp()
+        self.device.write(f"OUTPut1:STATe ON")
 
         # TODO: AC Base Commands
 

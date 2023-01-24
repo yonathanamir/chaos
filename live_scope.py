@@ -50,11 +50,13 @@ def init_args(args):
     parser.add_argument('--prominence-epsilon', type=float, default=1/20)
 
     parser.add_argument('--v-am', action="store_true")
+    parser.add_argument('--vs', nargs="+", type=float)
     parser.add_argument('--v-min', type=float, default=0.1)
     parser.add_argument('--v-max', type=float, default=10.0)
     parser.add_argument('--v-num', type=int, default=100)
 
     parser.add_argument('--freq', type=float, default=25.0e3)
+    parser.add_argument('--freqs', nargs="+", type=float)
     parser.add_argument('--freq-sweep', action='store_true')
     parser.add_argument('--freq-min', type=float, default=10.0e3)
     parser.add_argument('--freq-max', type=float, default=40.0e3)
@@ -91,7 +93,12 @@ def do_main(args):
 
     if args.freq_sweep:
         ax = plt.axes(projection='3d')
-        ax.set_ylim([args.freq_min, args.freq_max])
+
+        if args.freqs:
+            freq_lims = [min(args.freqs), max(args.freqs)]
+        else:
+            freq_lims = [args.freq_min, args.freq_max]
+        ax.set_ylim(freq_lims)
         ax.set_ylabel("AC Frequency (Hz)")
         ax.set_zlim(args.ylim)
         ax.set_zlabel("Diode Voltage")
@@ -119,12 +126,12 @@ def do_main(args):
             if args.v_am:
                 # TODO: get from scope?
                 sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, freq)
-                print(f"Window: {sample_win_size}")
+                # print(f"Window: {sample_win_size}")
 
                 # TODO: Set AM voltage through AWG device
                 awg.set_ramp(am_freq=10)
 
-                # input("Fix Trigger on oscilloscope and enter anything to continue.")
+                input("Fix Trigger on oscilloscope and enter anything to continue.")
                 time.sleep(0.5)
                 input_v, datas = data_fetcher.get_data()
 
@@ -147,7 +154,8 @@ def do_main(args):
                         fig.canvas.flush_events()
                         fig.canvas.draw()
                                 
-                    if args.save and not args.freq_sweep:
+                    if args.save:
+                    # if args.save and not args.freq_sweep:
                         filename = os.path.join(args.save_path, f"freq-{int(freq)}.json")
                         with open(filename, 'w') as f:
                             f.write(json.dumps(peak_datas))                    
@@ -162,7 +170,11 @@ def do_main(args):
             print(f'Setting min v={args.v_min}')
             time.sleep(1)
             
-            for v in np.linspace(args.v_min, args.v_max, args.v_num):
+            if args.vs:
+                vs_list = np.array(args.vs)
+            else:
+                vs_list = np.linspace(args.v_min, args.v_max, args.v_num)
+            for v in vs_list:
                 awg.voltage = v
                 print(f'Setting v={v}')
                 if v not in all_peaks:
@@ -201,7 +213,7 @@ def do_main(args):
 
                             xs += list(v*np.ones(len(peaks)))
                             ys += peaks
-                                
+                            
                             if args.freq_sweep:
                                 zs += list(freq*np.ones(len(peaks)))
                                 ax.scatter(xs, zs, ys, color='k', s=args.marker_size)
@@ -210,7 +222,8 @@ def do_main(args):
                             fig.canvas.flush_events()
                             fig.canvas.draw()
                                 
-                    if args.save and not args.freq_sweep:
+                    # if args.save and not args.freq_sweep:
+                    if args.save:
                         filename = os.path.join(args.save_path, f"freq-{int(freq)}.json")
                         with open(filename, 'w') as f:
                             f.write(json.dumps(all_peaks))
@@ -220,7 +233,13 @@ def do_main(args):
         t1 = datetime.now()
         if args.freq_sweep:
             all_freq = {}
-            for freq in np.linspace(args.freq_min, args.freq_max, args.freq_num):
+            
+            
+            if args.freqs:
+                freq_list = np.array(args.freqs)
+            else:
+                freq_list = np.linspace(args.freq_min, args.freq_max, args.freq_num)
+            for freq in freq_list:
                 time.sleep(0.01)
                 awg.frequency = freq
                 print(f'Setting freq={freq}')
@@ -228,7 +247,8 @@ def do_main(args):
                 freq_peaks = v_sweep(args, freq)
                 all_freq[freq] = freq_peaks
         else:
-            awg.frequency = args.freq
+            if args.freq:
+                awg.frequency = args.freq
             v_sweep(args, args.freq)
 
         if args.save:
@@ -243,6 +263,8 @@ def do_main(args):
             t2 = datetime.now()
             input(f"Done sweep in {t2-t1}! Enter input to exit.")
             break
+
+        ax.cla()
 
         # except Exception as ex:
         #     print(ex)

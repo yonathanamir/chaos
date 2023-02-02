@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Nov 20 15:38:47 2022
+Basic application for collecting and viewing RLD circuit birfurcation data.
+Use --help flag for options, Check Readme.md for additional details.
 
 @author: Yonathan
 """

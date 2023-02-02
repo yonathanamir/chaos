@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Dec 30 02:02:40 2022
+General Visa Device base class.
 
 @author: Yonathan
 """
 
 import time
 import pyvisa as visa
-PRINT = True
+PRINT = False
 SLEEP_INTERVAL = 1
+
 
 class VisaDevice:
     def __init__(self, visa_address, timeout=1000, encoding='latin_1',
@@ -17,7 +19,7 @@ class VisaDevice:
         self.rm = visa.ResourceManager()
         self.connect()
         
-        self.device.timeout = timeout # ms
+        self.device.timeout = timeout  # in ms
         self.device.encoding = encoding
         self.device.read_termination = read_termination
         self.device.write_termination = write_termination

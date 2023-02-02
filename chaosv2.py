@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov 16 09:31:16 2022
+RLD bifurcation data parsing and analysis.
 
 @author: Yonathan
 """
@@ -14,13 +15,10 @@ from scipy import signal
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 
-from time import sleep
-from IPython.display import display, clear_output
 
-#%%
 _cache = {}
 
-#%%
+
 def read_data(file, col, end=None, use_cache=True, do_print=True):
     if isinstance(col, int):
         col = [col]

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Dec 30 02:10:13 2022
+Control a Tektronix AFG3000 Series A/F Generator
 
 @author: Yonathan
 """
@@ -16,10 +17,7 @@ class AwgDevice(VisaDevice):
     
     def connect(self):
         super().connect()
-        # self.off_ramp()
         self.device.write(f"OUTPut1:STATe ON")
-
-        # TODO: AC Base Commands
 
     @property
     @VisaDevice.reconnect_method

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Nov 20 17:39:19 2022
+DataFetchers for RLD circuit data. Includes a base class with test funcationality for debugging purposes and a proper
+VisaDevice written to use for Tektronix MDO3000 Series Oscilloscopes
 
 @author: Yonathan
 """
 
-import pyvisa as visa # http://github.com/hgrecco/pyvisa
-import time
 import numpy as np
 
 from visa_device import VisaDevice
@@ -31,19 +31,17 @@ class DataFetcher:
 
 
 class ScopeDataFetcher(VisaDevice):
-    def __init__(self, visa_address, channels_to_sample, output_lim):
+    def __init__(self, visa_address, channels_to_sample):
         super().__init__(visa_address=visa_address)
         self.scope = self.device
+        self.channels_to_sample = channels_to_sample
 
-        self.channels_to_sample = channels_to_sample        
-        self.dummy = None
-        
-        # self.rm = visa.ResourceManager()
-        
     def __del__(self):
         self.scope.close()
         self.rm.close()
 
+    # First channel is always treated as input
+    # TODO: Generalize this
     @VisaDevice.reconnect_method
     def get_data(self):
         input_v = self._sample_channel(1)
@@ -56,7 +54,6 @@ class ScopeDataFetcher(VisaDevice):
     
     @VisaDevice.reconnect_method
     def _sample_channel(self, channel):
-        # print(f'Sampling channel {channel}')
         self.scope.write('header 0')
         self.scope.write('data:encdg SRIBINARY')
         self.scope.write(f'data:source CH{channel}') # channel
@@ -74,8 +71,6 @@ class ScopeDataFetcher(VisaDevice):
         voff = float(self.scope.query('wfmoutpre:yzero?')) # reference voltage
         vpos = float(self.scope.query('wfmoutpre:yoff?')) # reference position (level)
 
-        if self.dummy is None:
-            self.dummy = np.zeros(unscaled_wave.shape)
         scaled_wave = (unscaled_wave - vpos) * vscale + voff
         
         return scaled_wave

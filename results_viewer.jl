@@ -1,3 +1,7 @@
+"""
+Interactive Dash and Plotly application for viewing 3D bifurcation diagrams.
+"""
+
 ## Init
 using JSON
 using PlotlyJS

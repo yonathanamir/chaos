@@ -1,16 +1,33 @@
-## 
-
+## Init
 using JSON
 using PlotlyJS
 using Dash
 using DataFrames
 
 files = [
-    raw"C:\University\Semester G\Lab B2\Final\full-sweep\full.json",
-    raw"C:\University\Semester G\Lab B2\Final\v54\run.json",
-    raw"C:\University\Semester G\Lab B2\Final\v62\run.json"
+    raw".\testruns\freq_sweeps.json",
+    raw".\testruns\volt_sweeps.json",
 ]
 
+struct Run
+    f::Float64
+    v::Float64
+end
+
+
+## Parse files
+# Each file should be a json containing data collected from runs. Format is a dictionary with:
+# {
+#     "{{AC Frequency (string)}}": {
+#             "{{Voltage (string)}}": [
+#                 {{peak (float)},
+#                 {{peak (float)},
+#                 {{peak (float)},
+#                 ...
+#             ]
+#         }
+# }
+# For examples check ./testruns/
 parsed = Dict()
 
 for file in files
@@ -33,12 +50,6 @@ for file in files
 
     close(f)
 end
-# print(parsed)
-
-struct Run
-    f::Float64
-    v::Float64
-end
 
 runs = Run[]
 freqs = collect(parse(Float64, f) for f in keys(parsed))
@@ -54,17 +65,12 @@ xs = []
 ys = []
 zs = []
 for run in runs
-        # append!(xs, [run.f])
-        # append!(ys, [run.v])
-        # append!(zs, [maximum(parsed[string(run.f)][1][string(run.v)])])
     for z in unique(parsed[string(run.f)][string(run.v)])
         append!(xs, [run.f])
         append!(ys, [run.v])
         append!(zs, [z])
     end
 end
-
-println(length(xs))
 
 df = DataFrame(f=xs,v=ys,z=zs)
 
@@ -141,6 +147,8 @@ function v_focus(df, volt)
     return Plot(trace, Layout(title = "Voltage = $volt", template = :plotly_dark))
 end
 
+## App
+
 app = dash()
 
 inline_graph_style = Dict(
@@ -160,7 +168,6 @@ dark_mode_style = Dict(
     "color" => "white"
 )
 
-# style=vertical_graph_style
 app.layout = html_div(style=dark_mode_style) do
     (html_div(style=vertical_graph_style) do 
         dcc_graph(id = "input-bi-map", figure=gen_3d_plot(df, nothing, nothing)),
@@ -179,26 +186,6 @@ app.layout = html_div(style=dark_mode_style) do
         dcc_graph(id = "volt-bi-map", style=inline_graph_style, figure=v_focus(df, 6.2))
     end)
 end
-
-# callback!(
-#     app,
-#     Output("freq-input", "value"),
-#     Input("input-bi-map", "clickData")
-# ) do click_data
-#     if !isnothing(click_data)
-#         return click_data["points"][1].x
-#     end
-# end
-
-# callback!(
-#     app,
-#     Output("volt-input", "value"),
-#     Input("input-bi-map", "clickData")
-# ) do click_data
-#     if !isnothing(click_data)
-#         return click_data["points"][1].y
-#     end
-# end
 
 callback!(
     app,

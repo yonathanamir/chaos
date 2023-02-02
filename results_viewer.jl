@@ -5,10 +5,34 @@ using PlotlyJS
 using Dash
 using DataFrames
 
+files = [
+    raw"C:\University\Semester G\Lab B2\Final\full-sweep\full.json",
+    raw"C:\University\Semester G\Lab B2\Final\v54\run.json",
+    raw"C:\University\Semester G\Lab B2\Final\v62\run.json"
+]
 
-f = open("C:\\University\\Semester G\\Lab B2\\Week 12\\am_sweep.json", "r")
-parsed = JSON.parse(f)
-close(f)
+parsed = Dict()
+
+for file in files
+    f = open(file, "r")
+    parsed_file = JSON.parse(f)
+    
+    for k in keys(parsed_file)
+        if !(k in keys(parsed))
+            parsed[k] = Dict()
+        end
+
+        for j in keys(parsed_file[k])
+            if !(j in keys(parsed[k]))
+                parsed[k][j] = []
+            end
+
+            append!(parsed[k][j], parsed_file[k][j])
+        end
+    end
+
+    close(f)
+end
 # print(parsed)
 
 struct Run
@@ -20,7 +44,7 @@ runs = Run[]
 freqs = collect(parse(Float64, f) for f in keys(parsed))
 
 for f in freqs
-    vs = collect(parse(Float64, v) for v in keys(parsed[string(f)][1]))
+    vs = collect(parse(Float64, v) for v in keys(parsed[string(f)]))
     for v in vs
         append!(runs, [Run(f, v)])
     end
@@ -33,21 +57,53 @@ for run in runs
         # append!(xs, [run.f])
         # append!(ys, [run.v])
         # append!(zs, [maximum(parsed[string(run.f)][1][string(run.v)])])
-    for z in parsed[string(run.f)][1][string(run.v)]
+    for z in unique(parsed[string(run.f)][string(run.v)])
         append!(xs, [run.f])
         append!(ys, [run.v])
         append!(zs, [z])
     end
 end
 
+println(length(xs))
+
 df = DataFrame(f=xs,v=ys,z=zs)
 
 ## Plot
 
-function gen_3d_plot(df, click_data)
+function gen_3d_plot(df, freq, volt)
     marker = attr(
-        size = 1,
-        color = :black
+        size = 0.5,
+        color=:black
+    )
+    
+    volt_surface = mesh3d(
+        x=[minimum(df.f), maximum(df.f), minimum(df.f), maximum(df.f)],
+        y=[volt, volt, volt, volt],
+        z=[minimum(df.z), minimum(df.z), maximum(df.z), maximum(df.z)],
+        opacity=0.2,
+        # Intensity of each vertex, which will be interpolated and color-coded
+        intensity=[0.5, 0.5],
+        # i, j and k give the vertices of triangles
+        # here we represent the 4 triangles of the tetrahedron surface
+        i=[0, 0, 0, 1],
+        j=[1, 2, 3, 2],
+        k=[2, 3, 1, 3],
+        showscale=false
+    )
+
+    freq_surface = mesh3d(
+        x=[freq, freq, freq, freq],
+        y=[minimum(df.v), maximum(df.v), minimum(df.v), maximum(df.v)],
+        z=[minimum(df.z), minimum(df.z), maximum(df.z), maximum(df.z)],
+        opacity=0.2,
+        # Intensity of each vertex, which will be interpolated and color-coded
+        intensity=[1, 1, 1, 1],
+        # i, j and k give the vertices of triangles
+        # here we represent the 4 triangles of the tetrahedron surface
+        i=[0, 0, 0, 1],
+        j=[1, 2, 3, 2],
+        k=[2, 3, 1, 3],
+        showscale=false
     )
 
     trace = scatter3d(x=df.f,y=df.v,z=df.z, marker=marker, mode="markers")
@@ -60,23 +116,29 @@ function gen_3d_plot(df, click_data)
         )
     )
 
-    if isnothing(click_data)
-        return Plot(trace, layout)
-    end
+    # if isnothing(click_data)
+    return Plot([volt_surface, freq_surface, trace], layout)
+    # end
+end
 
-    clicked_freq = click_data["points"][1].x
-    clicked_volt = click_data["points"][1].y
+function f_focus(df, freq)
+    filtered = filter(row -> row[:f] == freq, df)
+    trace = scatter(x=filtered.v, y=filtered.z, mode="markers",
+                        marker=attr(
+                            size = 3,
+                            color= :black
+                        ))
+    return Plot(trace, Layout(title = "Frequency = $freq", template = :plotly_dark))
+end
 
-    freq_range = [minimum(df.f), maximum(df.f)]
-    volt_range = [minimum(df.v), maximum(df.v)]
-    z_range = [minimum(df.z), maximum(df.z)]
-
-    trace = surface(x=freq_range, y=clicked_volt*ones(), z=volt_range, colorscale=[[0, "#FFDB58"], [1, "#FFDB58"]],  showscale=false)
-
-
-
-        
-    return Plot(trace, layout)
+function v_focus(df, volt)
+    filtered = filter(row -> row[:v] == volt, df)
+    trace = scatter(x=filtered.f, y=filtered.z, mode="markers",
+                        marker=attr(
+                            size = 3,
+                            color = :black
+                        ))
+    return Plot(trace, Layout(title = "Voltage = $volt", template = :plotly_dark))
 end
 
 app = dash()
@@ -101,54 +163,91 @@ dark_mode_style = Dict(
 # style=vertical_graph_style
 app.layout = html_div(style=dark_mode_style) do
     (html_div(style=vertical_graph_style) do 
-        dcc_graph(id = "input-bi-map", figure=gen_3d_plot(df, nothing))
+        dcc_graph(id = "input-bi-map", figure=gen_3d_plot(df, nothing, nothing)),
+        html_div(
+            children = [               
+                "Frequency: ",
+                dcc_input(id = "freq-input", value = "25000", type = "text"),
+                "Voltage: ",
+                dcc_input(id = "volt-input", value = "6.2", type = "text")
+            ]
+        )
     end),
     
     (html_div(id = "plane-divs") do
-        dcc_graph(id = "freq-bi-map", style=inline_graph_style),
-        dcc_graph(id = "volt-bi-map", style=inline_graph_style)
+        dcc_graph(id = "freq-bi-map", style=inline_graph_style, figure=f_focus(df, 25000)),
+        dcc_graph(id = "volt-bi-map", style=inline_graph_style, figure=v_focus(df, 6.2))
     end)
 end
+
+# callback!(
+#     app,
+#     Output("freq-input", "value"),
+#     Input("input-bi-map", "clickData")
+# ) do click_data
+#     if !isnothing(click_data)
+#         return click_data["points"][1].x
+#     end
+# end
+
+# callback!(
+#     app,
+#     Output("volt-input", "value"),
+#     Input("input-bi-map", "clickData")
+# ) do click_data
+#     if !isnothing(click_data)
+#         return click_data["points"][1].y
+#     end
+# end
 
 callback!(
     app,
     Output("freq-bi-map", "figure"),
-    Input("input-bi-map", "clickData"),
-) do click_data
-    if isnothing(click_data)
+    Input("freq-input", "value")
+) do f
+    if isnothing(f)
         return Plot()
     end
-    freq = click_data["points"][1].x
-    volt = click_data["points"][1].y
-
-    filtered = filter(row -> row[:f] == freq, df)
-    trace = scatter(x=filtered.v, y=filtered.z, mode="markers",
-                        marker=attr(
-                            size = 3,
-                            color = :black
-                        ))
-    return Plot(trace, Layout(title = "Frequency = $freq", template = :plotly_dark))
+    
+    if typeof(f) == String
+        f = parse(Float64, f)
+    end 
+    
+    return f_focus(df, f)
 end
 
 callback!(
     app,
     Output("volt-bi-map", "figure"),
-    Input("input-bi-map", "clickData"),
-) do click_data
-    if isnothing(click_data)
+    Input("volt-input", "value")
+) do v
+    if isnothing(v)
         return Plot()
     end
+    
+    if typeof(v) == String
+        v = parse(Float64, v)
+    end 
 
-    freq = click_data["points"][1].x
-    volt = click_data["points"][1].y
+    return v_focus(df, v)
+end
 
-    filtered = filter(row -> row[:v] == volt, df)
-    trace = scatter(x=filtered.f, y=filtered.z, mode="markers",
-                        marker=attr(
-                            size = 3,
-                            color = :black
-                        ))
-    return Plot(trace, Layout(title = "Voltage = $volt", template = :plotly_dark))
+
+callback!(
+    app,
+    Output("input-bi-map", "figure"),
+    Input("freq-input", "value"),
+    Input("volt-input", "value")
+) do f, v
+    if typeof(f) == String
+        f = parse(Float64, f)
+    end
+    
+    if typeof(v) == String
+        v = parse(Float64, v)
+    end
+    
+    return gen_3d_plot(df, f, v)
 end
 
 run_server(app, "0.0.0.0",10321, debug = true)

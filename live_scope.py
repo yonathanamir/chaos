@@ -14,82 +14,88 @@ import numpy as np
 import matplotlib.pyplot as plt
 import json
 import os
-import logging
-import sys
 from scipy import signal
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import chaosv2
+import chaos
 from data_fetchers import ScopeDataFetcher
 from awg_device import AwgDevice
-from chaosv2 import calculate_sample_win_size
-
-
-# logger = logging.getLogger('chaos')
-# logger.addHandler(logging.StreamHandler(sys.stdout))
-# logger.info('hi')
-
-def init_args(args):
-    parser = argparse.ArgumentParser()
-    
-    parser.add_argument('--scope-visa-address', type=str)
-    parser.add_argument('--awg-visa-address', type=str)
-    parser.add_argument('--channels-to-sample', type=int, default=1)
-    parser.add_argument('--samples-per-voltage', type=int, default=1)
-
-    parser.add_argument('--color', type=str, default='k')
-    parser.add_argument('--marker', type=str, default='.')
-    parser.add_argument('--marker-size', type=float, default=1)
-    parser.add_argument('--ylim', type=float, nargs=2, default=[0, 15])
-
-    parser.add_argument('--window-size', type=int, default=2000)
-    parser.add_argument('--window-pad', type=float, default=0.1)
-
-    parser.add_argument('--limit', type=float, default=1.0)
-    parser.add_argument('--offset', type=float, default=0)
-    parser.add_argument('--stride', type=float, default=1.0)
-
-    parser.add_argument('--prominence-epsilon', type=float, default=1/20)
-
-    parser.add_argument('--v-am', action="store_true")
-    parser.add_argument('--vs', nargs="+", type=float)
-    parser.add_argument('--v-min', type=float, default=0.1)
-    parser.add_argument('--v-max', type=float, default=10.0)
-    parser.add_argument('--v-num', type=int, default=100)
-
-    parser.add_argument('--freq', type=float, default=25.0e3)
-    parser.add_argument('--freqs', nargs="+", type=float)
-    parser.add_argument('--freq-sweep', action='store_true')
-    parser.add_argument('--freq-min', type=float, default=10.0e3)
-    parser.add_argument('--freq-max', type=float, default=40.0e3)
-    parser.add_argument('--freq-num', type=int, default=100)
-
-    parser.add_argument('--time-length-secs', type=float, default=1.0e-3)
-    parser.add_argument('--total-pixel-length', type=float, default=10.0e3)
-    parser.add_argument('--input-am-frequency', type=int, default=10)
-
-    parser.add_argument('--peak-mode', type=str, default="area")
-    parser.add_argument('--distance', type=int, default=50)
-    parser.add_argument('--peak-window', type=int, default=10)
-    
-    # time_length_secs = 4e-3 # in seconds
-    # total_pixel_length = 10**5
-    # input_am_frequency = 25 * 10 ** 3 # in Hz
-    
-    parser.add_argument('--draw', action='store_true')
-    parser.add_argument('--mesh', action='store_true')
-    parser.add_argument('--save', action='store_true')
-    parser.add_argument('--loop', action='store_true')
-    parser.add_argument('--save-path', type=str)
-    
-    return parser.parse_args(args)
+from chaos import calculate_sample_win_size
 
 
 COLOR_MAP = ['b', 'r', 'g', 'k', 'm']
 
 
+def init_args(args):
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--scope-visa-address', type=str,
+                        help="Visa address of the oscilloscope device")
+    parser.add_argument('--awg-visa-address', type=str,
+                        help="Visa address of the AWG device")
+    parser.add_argument('--channels-to-sample', type=int, default=1,
+                        help="Number of channels to sample")
+    parser.add_argument('--samples-per-voltage', type=int, default=1,
+                        help="Number of samples per voltage")
+
+    parser.add_argument('--marker', type=str, default='.',
+                        help="Marker for plotting")
+    parser.add_argument('--marker-size', type=float, default=1,
+                        help="Size of the marker for plotting")
+    parser.add_argument('--ylim', type=float, nargs=2, default=[0, 15],
+                        help="Y-axis limits for plotting")
+
+    parser.add_argument('--v-am', action="store_true",
+                        help="Flag to use amplitude modulation instead of voltage sweep.")
+    parser.add_argument('--v-min', type=float, default=0.1,
+                        help="Minimum voltage for the sweep.")
+    parser.add_argument('--v-max', type=float, default=10.0,
+                        help="Maximum voltage for the sweep.")
+    parser.add_argument('--v-num', type=int, default=100,
+                        help="Number of voltage steps in the sweep.")
+    parser.add_argument('--vs', nargs="+", type=float,
+                        help="Explicit list of voltages to sweep instead of using min-max-steps.")
+
+    parser.add_argument('--freq', type=float, default=25.0e3,
+                        help="Frequency to use if not sweeping.")
+    parser.add_argument('--freq-sweep', action='store_true',
+                        help="Flag to perform frequency sweep")
+    parser.add_argument('--freq-min', type=float, default=10.0e3,
+                        help="Minimum frequency (in Hz) in the sweep.")
+    parser.add_argument('--freq-max', type=float, default=40.0e3,
+                        help="Maximum frequency (in Hz) in the sweep.")
+    parser.add_argument('--freq-num', type=int, default=100,
+                        help="Number of frequency steps in the sweep.")
+    parser.add_argument('--freqs', nargs="+", type=float,
+                        help="Explicit lst of frequencies to sweep instead of using min-max-steps.")
+
+    parser.add_argument('--time-length-secs', type=float, default=1.0e-3,
+                        help="Total length of the signal in seconds.")
+    parser.add_argument('--total-pixel-length', type=float, default=10.0e3,
+                        help="Total length of the signal in pixels (traces).")
+
+    parser.add_argument('--peak-mode', type=str, default="area",
+                        help="Mode for detecting peaks in the signal. Available options: are `normal`, `prob` and `area`.")
+    parser.add_argument('--distance', type=int, default=50,
+                        help="Distance threshold for detecting peaks (in pixels).")
+    parser.add_argument('--peak-window', type=int, default=10,
+                        help="Size of the window (in pixels) used for peak detection.")
+    parser.add_argument('--prominence-epsilon', type=float, default=1/20,
+                        help="Prominence epsilon for peak detection")
+    
+    parser.add_argument('--draw', action='store_true',
+                        help="Plot the analyzed peak data as the program runs.")
+    parser.add_argument('--save', action='store_true',
+                        help="Save the results of each sweep to the save-path parameter.")
+    parser.add_argument('--save-path', type=str,
+                        help="Path to save to.")
+    parser.add_argument('--loop', action='store_true',
+                        help="After a full sweep, start another until Ctrl-C.")
+    
+    return parser.parse_args(args)
+
+
 def do_main(args):
-    print("hi")
     plt.ion()
     fig = plt.figure()
 
@@ -114,7 +120,7 @@ def do_main(args):
     
     mpl.rcParams['lines.markersize'] = args.marker_size
 
-    data_fetcher = ScopeDataFetcher(args.scope_visa_address, args.channels_to_sample, args.ylim)
+    data_fetcher = ScopeDataFetcher(args.scope_visa_address, args.channels_to_sample)
     awg = AwgDevice(args.awg_visa_address)
 
     if not args.freq_sweep:
@@ -124,11 +130,9 @@ def do_main(args):
 
     while True:
         def v_sweep(args, freq=None):
-
             if args.v_am:
                 # TODO: get from scope?
                 sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, freq)
-                # print(f"Window: {sample_win_size}")
 
                 # TODO: Set AM voltage through AWG device
                 awg.set_ramp(am_freq=10)
@@ -137,7 +141,7 @@ def do_main(args):
                 time.sleep(0.5)
                 input_v, datas = data_fetcher.get_data()
 
-                peak_datas = chaosv2.bi_data_from_am_data_single_window(input_v, datas, 
+                peak_datas = chaos.bi_data_from_am_data_single_window(input_v, datas,
                                                         win_size=sample_win_size, 
                                                         win_pad=0.0,
                                                         prominence_weight=0.1,
@@ -146,7 +150,7 @@ def do_main(args):
 
                 if args.draw:
                     for i, d in enumerate(peak_datas):
-                        xs, ys = chaosv2.flatten_peak_data(d)
+                        xs, ys = chaos.flatten_peak_data(d)
 
                         if args.freq_sweep:
                             zs = list(freq*np.ones(len(ys)))
@@ -157,15 +161,11 @@ def do_main(args):
                         fig.canvas.draw()
                                 
                     if args.save:
-                    # if args.save and not args.freq_sweep:
                         filename = os.path.join(args.save_path, f"freq-{int(freq)}.json")
                         with open(filename, 'w') as f:
                             f.write(json.dumps(peak_datas))                    
 
                 return peak_datas
-
-            # TODO: get from scope?
-            sample_win_size = calculate_sample_win_size(args.time_length_secs, args.total_pixel_length, freq)
 
             all_peaks = {}
             awg.voltage = args.v_min
@@ -186,21 +186,17 @@ def do_main(args):
 
                     for i in range(0, len(datas)):
                         curr_max_v = np.max(datas[i])
-                        # peaks = chaosv2.max_val_window_peaks(datas[i], sample_win_size, window_pad=args.window_pad)
-                        # peaks = chaosv2.extract_peaks(datas[i], prominence=1)
 
                         if args.peak_mode == "normal":
                             peak_indices, _ = signal.find_peaks(datas[i], prominence=curr_max_v*args.prominence_epsilon, distance=args.distance)
                             peaks = list(np.unique([datas[i][index] for index in peak_indices]))
                         elif args.peak_mode == "prob":
-                            peaks, indices = chaosv2.extract_peaks_prob(datas[i], peak_window=args.peak_window, distance=args.distance)
-                            # fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
-                            # peaks = list(fixed)
+                            peaks, indices = chaos.extract_peaks_prob(datas[i], peak_window=args.peak_window, distance=args.distance)
+
                             peaks = list(peaks)
                         elif args.peak_mode == "area":
-                            peaks, indices = chaosv2.extract_peaks_areas(datas[i], peak_window=args.peak_window, distance=args.distance )
-                            # fixed = peaks + np.average(np.array(datas[i][indices]) - peaks)
-                            # peaks = list(fixed)
+                            peaks, indices = chaos.extract_peaks_areas(datas[i], peak_window=args.peak_window, distance=args.distance )
+
                             peaks = list(peaks)
                         else:
                             raise Exception("Bad peak mode!")
@@ -236,7 +232,6 @@ def do_main(args):
         if args.freq_sweep:
             all_freq = {}
             
-            
             if args.freqs:
                 freq_list = np.array(args.freqs)
             else:
@@ -267,12 +262,6 @@ def do_main(args):
             break
 
         ax.cla()
-
-        # except Exception as ex:
-        #     print(ex)
-        #     print('Error getting data, sleeping for 5 sec...')
-        #     time.sleep(5)
-        #     os.system('cls')
 
 
 if __name__ == '__main__':

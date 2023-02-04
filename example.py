@@ -21,10 +21,12 @@ print("Done init.")
 single_file = r"C:\University\Semester G\Lab B2\chaos\testdata\single.csv"
 
 peak_datas = chaosv2.bi_data_from_am_file_single_window(single_file, cols=[4,10], win_size=sample_win_size)
-for i, d in enumerate(peak_datas):
-    xs, ys = chaosv2.flatten_peak_data(d)
-    plt.scatter(xs,ys, label=i, color='k', s=0.4, marker='.')
+d = peak_datas[0]
 
+xs, ys = chaosv2.flatten_peak_data(d)
+plt.scatter(xs,ys, color='k', s=0.4, marker='.')
+
+plt.title("Single RLD Circuit Bifurcation Map (Diode A)")
 plt.xlabel('Input Voltage (V)')
 plt.ylabel('Diode Voltage values (V)')
 plt.show()
@@ -43,8 +45,9 @@ for i, d in enumerate(peak_datas):
 
     plt.scatter(xs, ys, c=color, marker='.', label=f'Diode {DIODES[i]}')
 
-    plt.xlabel('Input Voltage (V)')
-    plt.ylabel('Diode Voltage values (V)')
+plt.title("Coupled RLD Circuit Bifurcation Map")
+plt.xlabel('Input Voltage (V)')
+plt.ylabel('Diode Voltage values (V)')
 
 lgnd = plt.legend()
 for handle in lgnd.legendHandles:

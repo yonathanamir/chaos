@@ -8,9 +8,7 @@ RLD bifurcation data parsing and analysis.
 
 import numpy as np
 import csv
-
 from scipy import signal
-from matplotlib import pyplot as plt
 
 
 _cache = {}
@@ -19,15 +17,25 @@ _do_print = False
 
 def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
     """
-    Calculates the sample window size based on the total time length, total pixel length and input amplitude modulation frequency.
+    Calculates the sample window size based on the total time length, total pixel length and input amplitude modulation
+    frequency.
 
-    Parameters:
-        total_time_length (float): Total time length of the experiment.
-        total_pixel_length (int): Total pixel length of the experiment.
-        input_am_frequency (float): Input amplitude modulation frequency.
+    Parameters
+    ----------
+    total_time_length : float
+        Total time length of the experiment.
 
-    Returns:
-        int: The calculated sample window size.
+    total_pixel_length : int
+        Total pixel length of the experiment.
+
+    input_am_frequency : float
+        Input amplitude modulation frequency.
+
+    Returns
+    ----------
+    sample_window_size : int
+        The calculated sample window size.
+
     """
     dt = total_time_length / total_pixel_length
     return int(1 / (input_am_frequency * dt))
@@ -37,13 +45,22 @@ def read_data(file, col, use_cache=True):
     """
     Reads data from a CSV file and returns the specified columns.
     
-    Parameters:
-        file (str): The file path.
-        col (int or list of ints): The columns to return.
-        use_cache (bool, optional): Whether to use a cache for the data (default is True).
+    Parameters
+    ----------
+    file : str)
+        The file path.
+
+    col : int or list of ints
+        The columns to return.
+
+    use_cache : bool, optional
+        Whether to use a cache for the data (default is True).
     
-    Returns:
-        list or tuple of lists: The specified columns of data.
+    Returns
+    ----------
+    cols_data : list
+        The data for each column.
+
     """
     if isinstance(col, int):
         col = [col]
@@ -77,77 +94,46 @@ def read_data(file, col, use_cache=True):
     return _cache[cache_key]
 
 
-def read_modulated_data(file, win_size, limit=1, offset=0, cols=[4, 10], stride=1):
+def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=0, peaks_method=None, *args, **kwargs):
     """
-    This function reads the modulated data from a file and returns the analyzed AM signal.
+    The function outputs a list of dictionaries, with each dictionary representing the measured data at each frequency.
+    Each dictionary maps the maximum voltage in a window to a list of peak values in that window.
 
-    Parameters:
-    file (str): The file path to be read.
-    win_size (int): The size of the sliding window to be used in the analysis.
-    limit (int): The number of samples to be analyzed, with a default value of 1.
-    offset (int): The number of samples to be skipped before starting the analysis, with a default value of 0.
-    cols (list): A list of columns to be read from the file, with a default value of [4, 10].
-    stride (int): The step size to be used in the sliding window, with a default value of 1.
+    The function divides the input_v into windows with size win_size and a padding of win_pad, and for each window it
+    extracts the maximum voltage in the window and uses it as the key in the output dictionary. It then uses the
+    peaks_method to extract peaks from the corresponding section of each measured_data and adds these peaks to the list
+    in the output dictionary for the current window's maximum voltage. The offsets variable is used to keep track of the
+    starting index for each iteration of the loop but is not implemented yet.
 
-    Returns:
-    dict: A dictionary containing the analyzed AM signal data.
+    Parameters
+    ----------
+    input_v : ndarray or list
+        A 1-dimensional array, representing the input voltages.
+
+    measured_data : ndarray or list
+        A list of 1-dimensional arrays, representing the measured data from each channel.
+
+    win_size : int
+        The size of the window.
+
+    win_pad : float, optional
+        The padding of the window (default value is 0).
+
+    peaks_method : function, optional
+        A method to extract peaks from a data set (default is extract_peaks_areas).
+
+    Returns
+    ----------
+        peak_datas : dict
+            A dictionary representing the peaks for each voltage, for each channel. Use flatten_peak_data to turn this
+            object into xs and ys lists for scatter plot.
     """
-    if _do_print:
-        print(f'Reading modulated file {file}')
-    cols_data = read_data(file, col=cols)
-    input_v = cols_data[0]
-    measured_data = cols_data[1:]
-    
-    return analyze_am_signal(input_v, measured_data, win_size, limit, offset, stride)
-
-
-def analyze_am_signal(input_voltage, measured_data, win_size, limit=1, 
-                      offset=0, stride=1):
-
-    if _do_print:
-        print('Analyzing AM signal.')
-    data = []
-    for _ in measured_data:
-        data.append({})
-    
-    length = len(input_voltage)
-    
-    trace_offset = int(length*offset)
-    trace_limit = int(length*limit)-int(win_size*stride)+trace_offset
-    
-    for i in range(trace_offset, trace_limit, int(win_size*stride)):
-        if _do_print:
-            print(f'Step {i}')
-        
-        sub_i_v = input_voltage[i:i+win_size]
-        voltage = int(np.max(np.abs(np.asarray(sub_i_v))) * 1000)
-        
-        for j, measurement in enumerate(measured_data):
-            sub_array = measurement[i: i+win_size]
-            if voltage in data[j]:  
-                data[j][voltage] = np.append(data[j][voltage], sub_array)
-            else:
-                data[j].update({voltage: sub_array})
-    if _do_print:
-        print(f'Done reading. Data length: {len(data[0])}')
-
-    return np.asarray(data)
-
-
-def bi_data_from_am_file_single_window(am_file, cols, win_size, win_pad=0, epsilon_factor=0.02):
-    if _do_print:
-        print(f'Reading modulated file {am_file} with dingle window.')
-    cols_data = read_data(am_file, col=cols)
-    input_v = cols_data[0]
-    measured_data = cols_data[1:]
-        
-    return bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=win_pad)
-
-
-def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=0):
     results = []
     for _ in measured_data:
         results.append({})
+
+    if peaks_method is None:
+        peaks_method = extract_peaks_areas
 
     offsets = np.zeros(len(measured_data), int)  # TODO: Auto detect offsets for first peaks
         
@@ -161,22 +147,47 @@ def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad
                 results[j][v] = []
                 
             sub_data = data[min_i:max_i]
-            peaks, indices = extract_peaks_areas(sub_data)
+            peaks, indices = peaks_method(sub_data, *args, **kwargs)
             results[j][v] += [sub_data[i] for i in indices]
         
     return results
 
 
+def bi_data_from_am_file_single_window(am_file, cols, *args, **kwargs):
+    """
+    Read AM file and return bi_data_from_am_data_single_window.
+    """
+    if _do_print:
+        print(f'Reading modulated file {am_file} with dingle window.')
+    cols_data = read_data(am_file, col=cols)
+    input_v = cols_data[0]
+    measured_data = cols_data[1:]
+
+    return bi_data_from_am_data_single_window(input_v, measured_data, *args, **kwargs)
+
+
 def flatten_peak_data(peak_data):
     """
-    Takes as input a nested dictionary peak_data and returns two arrays a and b containing the values of the keys and
-    values in the dictionary, respectively. The function starts by initializing an empty list vals. Then, it uses a
-    nested list comprehension to flatten the dictionary. The nested list comprehension iterates over the keys voltage of
-    peak_data, and for each key, it adds an array [voltage, peak] to the list, where peak is the value corresponding to
-    the voltage key in peak_data.
+    Flatten a peak_data dictionary into a scatter plot ready xs and ys lists.
+
+    Takes as input a nested dictionary peak_data and returns two arrays, xs and ys containing the input voltages (values
+    of the keys) and diode peak voltages (values in the dictionary,) respectively.
+
+    The function starts by initializing an empty list vals. Then, it uses nested list comprehension to flatten the
+    dictionary. The nested list comprehension iterates over the keys (input voltages) of peak_data, and for each key, it
+    adds an array [voltage, peak] to the list, where peak is the value corresponding to the voltage key in peak_data.
 
     Finally, the function converts the resulting nested list to a numpy array res, and returns res[:,0] and res[:,1],
-    which are the first and second columns of res, respectively.
+    which are the first (xs) and second (ys) columns of res, respectively.
+
+    Returns
+    ----------
+        xs : ndarray
+            asd
+
+        ys : ndarray
+            asdfas
+
     """
     vals = []
     for x in np.asarray([
@@ -191,7 +202,7 @@ def flatten_peak_data(peak_data):
     
 
 def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon=0.01, fixed_window=False,
-                        peak_window=10, normalize=False):
+                        peak_window=10, normalize=False, *args, **kwargs):
     """
     Extracts the areas of peaks in a signal.
 
@@ -199,28 +210,35 @@ def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon
     For each peak, the area under the curve is computed using the trapezoidal rule (`np.trapz`).
     The area of the peak is considered if it is greater than 0.
 
-    Parameters:
+    Parameters
     -----------
     data: numpy.ndarray
         The input signal.
+
     prominence_epsilon: float, optional (default=0.2)
         The prominence value for the `scipy.signal.find_peaks` function, relative to the maximum value of the data.
+
     distance: int, optional (default=100)
         The distance value for the `scipy.signal.find_peaks` function.
+
     zero_epsilon: float, optional (default=0.01)
         The zero-threshold value for determining the extent of the peak, relative to the maximum value of the data.
+
     fixed_window: bool, optional (default=False)
         If True, the peak window is a fixed size equal to `peak_window` on both sides of the peak.
         If False, the window extends until the values in the signal drop below the `zero_epsilon` threshold.
+
     peak_window: int, optional (default=10)
         The size of the peak window for computation of the area, if `fixed_window` is True.
+
     normalize: bool, optional (default=False)
         If True, the areas of the peaks are normalized by `peak_window*2`.
 
-    Returns:
+    Returns
     --------
     numpy.ndarray, numpy.ndarray:
         The areas of the peaks and the indices of the peaks in the input `data`.
+
     """
     ret_peak_vals = []
     ret_peak_indices = []
@@ -256,7 +274,7 @@ def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon
     return ret_peak_vals, ret_peak_indices
     
 
-def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=100):
+def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=100, *args, **kwargs):
     """
     Extracts the peaks in the input signal `data` using the `prominence` and `distance` parameters of the `find_peaks`
     function from the `scipy.signal` library. The `peak_window` parameter is used to define a sliding window around each
@@ -266,10 +284,14 @@ def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=10
     ----------
     data : list or numpy.ndarray
         The input signal data.
+
     prominence_epsilon : float, optional
-        The fraction of the maximum value of the `data` signal to be used as the `prominence` parameter for the `find_peaks` function. The default value is 0.2.
+        The fraction of the maximum value of the `data` signal to be used as the `prominence` parameter for the
+        `find_peaks` function. The default value is 0.2.
+
     peak_window : int, optional
         The size of the sliding window to be used around each peak. The default value is 10.
+
     distance : int, optional
         The `distance` parameter for the `find_peaks` function. The default value is 100.
 
@@ -277,6 +299,7 @@ def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=10
     -------
     numpy.ndarray, list
         A numpy array of peak values and a list of peak indices.
+
     """
 
     ret_peak_vals = []
@@ -293,7 +316,7 @@ def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=10
     return np.array(ret_peak_vals), ret_peak_indices
 
 
-def extract_peaks(x, prominence=0.5, win_size=None):
+def extract_peaks(data, prominence=0.5, win_size=None, *args, **kwargs):
     """
     extract_peaks is a method that extracts the peak values from a given input signal, x. The peaks are found using the
     find_peaks function from the signal library.
@@ -301,23 +324,32 @@ def extract_peaks(x, prominence=0.5, win_size=None):
     the peaks are extracted from the whole signal. If win_size is provided, the signal is divided into windows of the
     given size, and peaks are extracted from each window.
 
-    Parameters:
-    x (list): A 1D list of numeric values representing the input signal.
-    prominence (float): The minimum prominence of a peak to be considered a peak. Defaults to 0.5.
-    win_size (int): The size of the window to divide the signal into. If not provided, the whole signal is used.
+    Parameters
+    ----------
+    data : list
+        A 1D list of numeric values representing the input signal.
 
-    Returns:
-    A list of peak values, representing the y-value of the peaks.
+    prominence : float
+        The minimum prominence of a peak to be considered a peak. Defaults to 0.5.
+
+    win_size : int
+        The size of the window to divide the signal into. If not provided, the whole signal is used.
+
+    Returns
+    ----------
+    peak_vals : list
+        A list of peak values, representing the y-value of the peaks.
+
     """
     if win_size is None:
-        peak_indices = signal.find_peaks(x, prominence=prominence)[0]
-        peak_vals = [x[i] for i in peak_indices]
+        peak_indices = signal.find_peaks(data, prominence=prominence)[0]
+        peak_vals = [data[i] for i in peak_indices]
     else:
         peak_vals = []
-        for i in range(0, len(x), win_size):
+        for i in range(0, len(data), win_size):
             min_i = i
             max_i = i+win_size
-            sub_data = x[min_i:max_i]
+            sub_data = data[min_i:max_i]
 
             peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
             peak_vals += [sub_data[i] for i in peak_indices]
@@ -325,20 +357,34 @@ def extract_peaks(x, prominence=0.5, win_size=None):
     return list(peak_vals)
 
 
-def max_val_window_peaks(data, win_size, offset=0, window_pad=0):
+# TODO: This method is a WIP and doesn't always work well.
+def find_bifurcations(bi_map, threshold=1.0, back_window=1):
     """
+    The find_bifurcations method performs the task of finding bifurcations in a bi-map data. The bi-map data is a 2D
+    array, where each row represents the input voltage and the corresponding value of the diode voltage.
+
+    The method starts by aggregating the data, joining all the diode voltages for a particular input voltage. It then
+    calculates the number of bifurcations for each input voltage, by counting the number of jumps between adjacent diode
+    voltages that are greater than the threshold. The number of bifurcations is calculated using the k-means clustering
+    algorithm.
+
+    Parameters
+    ----------
+    threshold : float
+        Used to determine the  minimum difference between two adjacent diode voltages, which will be considered as a jump.
+
+    back_window : int
+        used to check the maximum number of rows before the current row, to determine if the current row is a
+        bifurcation point or not.
+
+    Returns
+    ----------
+    jump_voltages : list
+        Returns the input voltages that correspond to the bifurcation points, which are defined as the rows where the
+        number of bifurcations is greater than the maximum number of bifurcations in the back_window rows before the
+        current row.
+
     """
-    peak_vals = []
-    for i in range(offset, len(data), win_size):
-        min_i = int(max(i-(window_pad*win_size), 0))
-        max_i = int(min(i+(1+window_pad)*win_size, len(data)))
-    
-        peak_vals.append(np.max(data[min_i:max_i]))
-    
-    return np.asarray(peak_vals)
-
-
-def find_bifurcations(bi_map, threshold=1, back_window=1):
     from scipy import cluster
 
     # Aggregate data

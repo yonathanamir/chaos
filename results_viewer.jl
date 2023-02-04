@@ -10,8 +10,8 @@ using DataFrames
 using StatsBase
 
 files = [
-    raw".\testruns\freq_sweeps.json",
-    raw".\testruns\volt_sweeps.json",
+    raw".\testdata\freq_sweeps.json",
+    raw".\testdata\volt_sweeps.json",
 ]
 
 struct Run

@@ -17,35 +17,36 @@ import matplotlib as mpl
 
 
 _cache = {}
+_do_print = False
 
 
-def read_data(file, col, end=None, use_cache=True, do_print=True):
+def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
+    dt = total_time_length / total_pixel_length
+    return int(1 / (input_am_frequency * dt))
+
+
+def read_data(file, col, use_cache=True):
     if isinstance(col, int):
         col = [col]
     
     cache_key = (file, ','.join([str(x) for x in col]))
-    if do_print:
+    if _do_print:
         print(f'Cache key: {cache_key}')
     if use_cache and cache_key in _cache:
-        if do_print:
+        if _do_print:
             print(f'Cache hit for {cache_key}!')
         return _cache[cache_key]
     
     filedata = []
         
-    for c in col:
+    for _ in col:
         filedata.append([])
         
-    if do_print:
+    if _do_print:
         print(f'Opening {file}')
     with open(file) as csvfile:
         reader = csv.reader(csvfile)
-        if end is None:
-            it = reader
-        else:
-            it = [r for i,r in enumerate(reader) if i <= end]
         for i, row in enumerate(reader):
-            # print(f'Reading {i}')
             for j, c in enumerate(col):
                 filedata[j].append(float(row[c]))
     
@@ -55,53 +56,36 @@ def read_data(file, col, end=None, use_cache=True, do_print=True):
         _cache[cache_key] = tuple(filedata)
         
     return _cache[cache_key]
-    
-def read_folder(path):
-    data={}
-    files = glob.glob(f'{path}/*.csv')
-    files = [f for f in files if 'am' not in f]
-    
-    print(f'Reading {len(files)} files...')
-    for file in files:
-        m_volts = int(os.path.basename(file).split('.')[0])
-        data.update({m_volts: read_data(file)})
-        
-        print(f'Reading {file}')
 
-    print('')
-    print('Done reading.')
-    return data
 
-def read_modulated_data(file, win_size, limit=1, offset=0, cols=[4, 10], stride=1, do_print=True):
-    if do_print:
+def read_modulated_data(file, win_size, limit=1, offset=0, cols=[4, 10], stride=1):
+    if _do_print:
         print(f'Reading modulated file {file}')
-    cols_data = read_data(file, col=cols, do_print=do_print)
+    cols_data = read_data(file, col=cols)
     input_v = cols_data[0]
     measured_data = cols_data[1:]
     
-    return analyze_am_signal(input_v, measured_data, win_size, limit, offset, stride, do_print=do_print)
+    return analyze_am_signal(input_v, measured_data, win_size, limit, offset, stride)
 
 
 def analyze_am_signal(input_voltage, measured_data, win_size, limit=1, 
-                      offset=0, stride=1, do_print=True):
-    if do_print:
+                      offset=0, stride=1):
+    if _do_print:
         print('Analyzing AM signal.')
-    data=[]
-    for i in measured_data:
+    data = []
+    for _ in measured_data:
         data.append({})
     
-    length=len(input_voltage)
+    length = len(input_voltage)
     
     trace_offset = int(length*offset)
     trace_limit = int(length*limit)-int(win_size*stride)+trace_offset
-        
     
     for i in range(trace_offset, trace_limit, int(win_size*stride)):
-        if do_print:
+        if _do_print:
             print(f'Step {i}')
         
         sub_i_v = input_voltage[i:i+win_size]
-        
         voltage = int(np.max(np.abs(np.asarray(sub_i_v))) * 1000)
         
         for j, measurement in enumerate(measured_data):
@@ -110,53 +94,32 @@ def analyze_am_signal(input_voltage, measured_data, win_size, limit=1,
                 data[j][voltage] = np.append(data[j][voltage], sub_array)
             else:
                 data[j].update({voltage: sub_array})
-    if do_print:
+    if _do_print:
         print(f'Done reading. Data length: {len(data[0])}')
-    # if len(data) == 1:
-    #     return data[0]
-    
+
     return np.asarray(data)
 
 
 def bi_data_from_am_file_single_window(am_file, cols, win_size, win_pad=0, 
                                        prominence_weight=0.1, epsilon_factor=0.02,
-                                       do_print=True, 
                                        auto_offset=False):
-    if do_print:
+    if _do_print:
         print(f'Reading modulated file {am_file} - NEW!!!')
-    cols_data = read_data(am_file, col=cols, do_print=do_print)
+    cols_data = read_data(am_file, col=cols)
     input_v = cols_data[0]
     measured_data = cols_data[1:]
         
-    return bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=win_pad, 
-                                                prominence_weight=prominence_weight, epsilon_factor=epsilon_factor,
-                                                do_print=do_print, 
-                                                auto_offset=auto_offset)
+    return bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=win_pad, epsilon_factor=epsilon_factor, )
 
 
-def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=0, 
-                                       prominence_weight=0.1, epsilon_factor=0.02,
-                                       do_print=True, 
-                                       auto_offset=False):
+def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad=0, epsilon_factor=0.02):
     results = []
     for d in measured_data:
         results.append({})
 
-    offsets = np.zeros(len(measured_data), int)
-    if auto_offset:
-        inner_window = 0.3
-        for i, data in enumerate(measured_data):
-            epsilon = np.array(data[0:win_size]).max() * epsilon_factor
-            for j in range(0, win_size):
-                sub_data = data[j:j+win_size]
-
-                if np.all(sub_data[0:int(len(sub_data)*inner_window)] < epsilon) and \
-                    np.all(sub_data[int(len(sub_data)*(1-inner_window)):len(sub_data)] < epsilon):
-                    offsets[i] = j
-                    break
+    offsets = np.zeros(len(measured_data), int)  # TODO: Auto detect offsets for first peaks
         
     for j, data in enumerate(measured_data):
-        epsilon = np.max(data) * epsilon_factor
         for i in range(offsets[j], len(input_v), win_size):
             min_i = max(0, int(i-(win_size*win_pad)))
             max_i = min(len(input_v), int(i+(1+win_pad)*win_size))
@@ -166,21 +129,8 @@ def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad
                 results[j][v] = []
                 
             sub_data = data[min_i:max_i]
-
-            # plt.plot(sub_data)
-            # plt.ylim(-1,10)
-            # plt.title(f"v={v},[{min_i}:{max_i}]")
-            # plt.show()
-
-            # prominence = prominence_weight*max(np.abs(sub_data))
-            # peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
-
             peaks, indices = extract_peaks_areas(sub_data)
             results[j][v] += [sub_data[i] for i in indices]
-            
-            # peak = np.max(sub_data)
-            # # if peak > epsilon:
-            # results[j][v] += [peak]
         
     return results
 
@@ -196,42 +146,6 @@ def flatten_peak_data(peak_data):
                 vals.append(y)
     res = np.array(vals)
     return res[:,0], res[:,1]
-                
-
-
-def multiprocess_analyzer_am_signal(input_voltage, measured_data, 
-                                    win_size, limit=1, offset=0, stride=1, 
-                                    do_print=True, max_workers=1):
-    import concurrent.futures
-    
-    data_length = len(input_voltage)
-    index_map = [int(data_length*i/max_workers) for i in range(max_workers+1)]
-    
-    exec_results = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_data = {
-                executor.submit(analyze_am_signal, 
-                                input_voltage[index_map[i]: index_map[i+1]],
-                                measured_data[:, index_map[i]: index_map[i+1]],
-                                win_size, limit, offset, stride, False): i
-                for i in range(max_workers)
-            }
-        
-        for future in concurrent.futures.as_completed(future_to_data):
-            data = future_to_data[future]
-            res = future.result()
-            exec_results[data] = res
-            
-    final = [{} for i in range(measured_data.shape[0])]
-    for worker in exec_results:
-        for i, val in enumerate(exec_results[worker]):
-            for voltage in val:
-                if voltage in final[i]:
-                    final[i][voltage] = np.append(final[i][voltage], val[voltage])
-                else:
-                    final[i][voltage] = val[voltage]
-            
-    return final
     
 
 def extract_peaks_areas(data, prominence_epsilon=0.2, distance=100, zero_epsilon=0.01, fixed_window=False, peak_window=10, normalize=False):
@@ -285,16 +199,13 @@ def extract_peaks_prob(data, prominence_epsilon=0.2, peak_window=10, distance=10
     return np.array(ret_peak_vals), ret_peak_indices
 
 
-def extract_peaks(x, prominence=0.5, win_size = None):
+def extract_peaks(x, prominence=0.5, win_size=None):
     if win_size is None:
         peak_indices = signal.find_peaks(x, prominence=prominence)[0]
         peak_vals = [x[i] for i in peak_indices]
     else:
         peak_vals = []
         for i in range(0, len(x), win_size):
-            # min_i = int(max(i-(window_pad*win_size), 0))
-            # max_i = int(min(i+(1+window_pad)*win_size, len(data)))
-            
             min_i = i
             max_i = i+win_size
             sub_data = x[min_i:max_i]
@@ -302,7 +213,7 @@ def extract_peaks(x, prominence=0.5, win_size = None):
             peak_indices = signal.find_peaks(sub_data, prominence=prominence)[0]
             peak_vals += [sub_data[i] for i in peak_indices]
 
-    return list(set(peak_vals))
+    return list(peak_vals)
 
 
 def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
@@ -311,9 +222,6 @@ def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
     for i in range(offset, len(data), win_size):
         min_i = int(max(i-(window_pad*win_size), 0))
         max_i = int(min(i+(1+window_pad)*win_size, len(data)))
-        
-        # min_i = i
-        # max_i = i+win_size
     
         peak_vals.append(np.max(data[min_i:max_i]))
         if _DEBUG:
@@ -323,6 +231,7 @@ def max_val_window_peaks(data, win_size, offset=0, _DEBUG=True,
             plt.show();
     
     return np.unique(np.around(peak_vals, 3))
+
 
 def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
                 do_print=True, win_size=None, window_pad = 0,use_find_peaks = False):        
@@ -342,6 +251,7 @@ def plot_bi_map(data, c='k', marker='.', show=True, label=None, prominence=0.5,
     if do_print:
         print('Done plotting.')
     return vals
+
 
 def gen_bi_plot_data(data, do_print=True, prominence=1, use_find_peaks = False,
                      win_size=None, window_pad = 0):
@@ -379,27 +289,6 @@ def gen_bi_plot_data(data, do_print=True, prominence=1, use_find_peaks = False,
                 
     return np.asarray(vals)
 
-def plot_zooms(data, filters, legend_mapping, prefix=None, marker='.'):
-    colors = legend_mapping[0]
-    for j, f in enumerate(filters):
-        print(f'Plotting {f[0]}-{f[1]}')
-        legend_loc = None
-        if isinstance(f, tuple):
-            legend_loc = f[1]
-            f = f[0]
-
-        for i in [0,1]:
-            filtered_keys = [k for k in data[i].keys() if f[0] <= k <= f[1]]
-            filtered = {}
-            for k in filtered_keys:
-                filtered[k] = data[i][k]
-
-            mpl.rcParams['lines.markersize'] = 4
-            plot_bi_map(filtered, c=colors[i], show=False, marker=marker)
-
-#         plt.title(f'{prefix}section {chr(j+65)} ({f[0]}-{f[1]} mV)')
-        plt.title(f'{prefix}section {j+1} ({f[0]}-{f[1]} mV)')
-        plt.show()
 
 def find_bifurcations(bi_map, threshold = 1, back_window=1):
     from scipy import cluster
@@ -429,12 +318,6 @@ def find_bifurcations(bi_map, threshold = 1, back_window=1):
                 x[i,:] = [voltage, 0]
         else:
             x[i,:] = [voltage, 0]
-
-    # jump_voltages = [
-    #     (np.min([y[0] for y in x if y[1]==a]), a) 
-    #     for a in np.unique(x[:,1])
-    #     if a > 1
-    #     ]
     
     jump_voltages = [
         x[i,:] for i in range(1,x.shape[0])
@@ -442,7 +325,3 @@ def find_bifurcations(bi_map, threshold = 1, back_window=1):
         ]
             
     return jump_voltages
-
-def calculate_sample_win_size(total_time_length, total_pixel_length, input_am_frequency):
-    dt = total_time_length / total_pixel_length
-    return int(1 / (input_am_frequency * dt))

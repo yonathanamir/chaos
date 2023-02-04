@@ -7,6 +7,7 @@ using JSON
 using PlotlyJS
 using Dash
 using DataFrames
+using StatsBase
 
 files = [
     raw".\testruns\freq_sweeps.json",
@@ -18,6 +19,13 @@ struct Run
     v::Float64
 end
 
+
+min_res = 0.01
+
+
+function round_to_res(num)
+    return round(num/min_res)*min_res
+end
 
 ## Parse files
 # Each file should be a json containing data collected from runs. Format is a dictionary with:
@@ -33,6 +41,7 @@ end
 # }
 # For examples check ./testruns/
 parsed = Dict()
+countlist = []
 
 for file in files
     f = open(file, "r")
@@ -48,7 +57,10 @@ for file in files
                 parsed[k][j] = []
             end
 
-            append!(parsed[k][j], parsed_file[k][j])
+            rounded = map(round_to_res, parsed_file[k][j])
+            counter = countmap(rounded)
+
+            append!(parsed[k][j], collect(keys(counter)))
         end
     end
 

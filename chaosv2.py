@@ -102,8 +102,9 @@ def bi_data_from_am_data_single_window(input_v, measured_data, win_size, win_pad
     The function divides the input_v into windows with size win_size and a padding of win_pad, and for each window it
     extracts the maximum voltage in the window and uses it as the key in the output dictionary. It then uses the
     peaks_method to extract peaks from the corresponding section of each measured_data and adds these peaks to the list
-    in the output dictionary for the current window's maximum voltage. The offsets variable is used to keep track of the
-    starting index for each iteration of the loop but is not implemented yet.
+    in the output dictionary for the current window's maximum voltage.
+
+    The offsets variable is used to keep track of the starting index for each channel but is not implemented yet.
 
     Parameters
     ----------

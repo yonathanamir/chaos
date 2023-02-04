@@ -21,7 +21,7 @@ class DataFetcher:
             file = r"C:\Users\owner\Desktop\yonathan\week 3\parallel.csv"
             cols = [4, 10]
             
-            from chaosv2 import read_data
+            from chaos import read_data
             cols_data = read_data(file, col=cols)
             input_v = cols_data[0]
             measured_data = cols_data[1:]

@@ -14,13 +14,12 @@ files = [
     raw".\testdata\volt_sweeps.json",
 ]
 
+min_res = 0.01  # in Volts
+
 struct Run
     f::Float64
     v::Float64
 end
-
-
-min_res = 0.01
 
 
 function round_to_res(num)
@@ -40,6 +39,7 @@ end
 #         }
 # }
 # For examples check ./testruns/
+
 parsed = Dict()
 countlist = []
 

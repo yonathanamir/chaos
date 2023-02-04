@@ -30,7 +30,7 @@ For detailed option descriptions, run:
 
 ## chaos.py
 A collection of methods to analyze raw data from the Oscilloscope.
-The module is well documented and examples are provided in `examples.py`. The results from the test data should come out as:
+The module is well documented and examples are provided in `example.py`. The results from the test data should come out as:
 
 <span>
 <img src="./images/single_bimap.png" width="40%">

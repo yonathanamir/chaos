@@ -18,7 +18,7 @@ sample_win_size = chaos.calculate_sample_win_size(time_length_secs, total_pixel_
 print("Done init.")
 
 # Single
-single_file = r"C:\University\Semester G\Lab B2\chaos\testdata\single.csv"
+single_file = r"./testdata/single.csv"
 
 peak_datas = chaos.bi_data_from_am_file_single_window(single_file, cols=[4,10], win_size=sample_win_size)
 d = peak_datas[0]
@@ -32,7 +32,7 @@ plt.ylabel('Diode Voltage values (V)')
 plt.show()
 
 # Coupled
-double_files = r"C:\University\Semester G\Lab B2\chaos\testdata\coupled.csv"
+double_files = r"./testdata/coupled.csv"
 cols = [4, 10, 16]
 peak_datas = chaos.bi_data_from_am_file_single_window(double_files, cols=cols, win_size=sample_win_size)
 

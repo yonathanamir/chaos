@@ -237,12 +237,16 @@ def do_main(args):
             else:
                 freq_list = np.linspace(args.freq_min, args.freq_max, args.freq_num)
             for freq in freq_list:
-                time.sleep(0.01)
-                awg.frequency = freq
-                print(f'Setting freq={freq}')
-                time.sleep(0.01)
-                freq_peaks = v_sweep(args, freq)
-                all_freq[freq] = freq_peaks
+                try:
+                    time.sleep(0.01)
+                    awg.frequency = freq
+                    print(f'Setting freq={freq}')
+                    time.sleep(0.01)
+                    freq_peaks = v_sweep(args, freq)
+                    all_freq[freq] = freq_peaks
+                except BaseException as e:
+                    print(f"Sweep for f={freq} failed, skipping... Exception: {repr(e)}")
+                    continue
         else:
             if args.freq:
                 awg.frequency = args.freq
